@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from another_kind_of_media_organiser import cli
 from another_kind_of_media_organiser.cli import main
 
 
@@ -33,7 +34,8 @@ def test_propose_command_prints_a_read_only_summary(tmp_path: Path, capsys) -> N
     exit_code = main(["propose", str(tmp_path)])
 
     assert exit_code == 0
-    assert capsys.readouterr().out == (
+    captured = capsys.readouterr()
+    assert captured.out == (
         "Organisation proposal\n"
         "No files have been changed.\n"
         "\n"
@@ -48,6 +50,7 @@ def test_propose_command_prints_a_read_only_summary(tmp_path: Path, capsys) -> N
         "2023: 1\n"
         "2024: 1\n"
     )
+    assert captured.err == ""
 
 
 def test_propose_command_displays_a_collision_and_all_competing_sources(
@@ -125,3 +128,40 @@ def test_propose_command_shows_at_most_ten_deterministic_collision_examples(
     assert "Potential conflict files: 0\n" in first_output
     assert "Unverified conflict files: 0\n" in first_output
     assert "Showing 10 of 12 collisions\n" in first_output
+
+
+def test_non_interactive_progress_uses_plain_periodic_lines(
+    tmp_path: Path, capsys
+) -> None:
+    date = datetime(2024, 1, 3, tzinfo=timezone.utc)
+    create_collision(tmp_path, "IMG_001.jpg", date, ("a", "b", "c"))
+
+    assert main(["propose", str(tmp_path)]) == 0
+
+    progress_output = capsys.readouterr().err
+    assert "Collision classification: 0/2 files" in progress_output
+    assert "Collision classification: 2/2 files" in progress_output
+    assert "\r" not in progress_output
+    assert "\x1b" not in progress_output
+
+
+def test_ctrl_c_during_proposal_reports_safe_cancellation(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    media_path = tmp_path / "photo.jpg"
+    media_path.write_bytes(b"valuable media")
+
+    def interrupted_proposal(*_args, **_kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "generate_organisation_proposal", interrupted_proposal)
+
+    assert main(["propose", str(tmp_path)]) == 130
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == (
+        "Proposal generation cancelled.\n"
+        "No files have been changed.\n"
+    )
+    assert media_path.read_bytes() == b"valuable media"

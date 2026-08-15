@@ -154,3 +154,35 @@ def test_unreadable_canonical_makes_all_comparisons_unverified(
     assert proposal.exact_duplicate_files == 0
     assert proposal.potential_conflict_files == 0
 
+
+def test_reports_collision_candidate_progress_and_existing_hash_bytes(
+    tmp_path: Path,
+) -> None:
+    scan_result, _ = colliding_scan_result(
+        tmp_path, (b"same", b"same", b"diff")
+    )
+    progress = []
+
+    proposal = generate_organisation_proposal(scan_result, progress.append)
+
+    assert progress[0].processed_candidates == 0
+    assert progress[0].total_candidates == 2
+    assert progress[-1].processed_candidates == 2
+    assert progress[-1].exact_duplicate_files == 1
+    assert progress[-1].potential_conflict_files == 1
+    assert progress[-1].unverified_conflict_files == 0
+    assert progress[-1].bytes_hashed == 12
+    assert proposal.exact_duplicate_files == 1
+    assert proposal.potential_conflict_files == 1
+
+
+def test_does_not_report_collision_progress_when_there_are_no_candidates(
+    tmp_path: Path,
+) -> None:
+    media_path = tmp_path / "unique.jpg"
+    media_path.write_bytes(b"content")
+    progress = []
+
+    generate_organisation_proposal(scan_media_collection(tmp_path), progress.append)
+
+    assert progress == []

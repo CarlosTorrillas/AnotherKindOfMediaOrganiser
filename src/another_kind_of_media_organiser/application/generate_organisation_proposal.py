@@ -1,6 +1,8 @@
 """Application use case for generating an Organisation Proposal."""
 
 from collections import Counter, defaultdict
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -42,15 +44,66 @@ _REVIEW_DETAILS = {
 }
 
 
+@dataclass(frozen=True)
+class CollisionClassificationProgress:
+    """Observable progress through non-canonical collision candidates."""
+
+    processed_candidates: int
+    total_candidates: int
+    exact_duplicate_files: int
+    potential_conflict_files: int
+    unverified_conflict_files: int
+    bytes_hashed: int
+
+
+ProgressCallback = Callable[[CollisionClassificationProgress], None]
+
+
+class _ProgressTracker:
+    def __init__(self, total_candidates: int, callback: ProgressCallback) -> None:
+        self.total_candidates = total_candidates
+        self.callback = callback
+        self.processed_candidates = 0
+        self.bytes_hashed = 0
+        self.counts: Counter[PlacementClassification] = Counter()
+
+    def report(self) -> None:
+        self.callback(
+            CollisionClassificationProgress(
+                self.processed_candidates,
+                self.total_candidates,
+                self.counts[PlacementClassification.EXACT_DUPLICATE],
+                self.counts[PlacementClassification.POTENTIAL_CONFLICT],
+                self.counts[PlacementClassification.UNVERIFIED_CONFLICT],
+                self.bytes_hashed,
+            )
+        )
+
+    def add_hashed_bytes(self, count: int) -> None:
+        self.bytes_hashed += count
+        self.report()
+
+    def complete(self, classification: PlacementClassification) -> None:
+        self.counts[classification] += 1
+        self.processed_candidates += 1
+        self.report()
+
+
 def resolve_media_creation_date(media_entry: MediaEntry) -> datetime:
     """Resolve Media Creation Date using modification time as a temporary fallback."""
     return media_entry.modification_date
 
 
-def generate_organisation_proposal(scan_result: ScanResult) -> OrganisationProposal:
+def generate_organisation_proposal(
+    scan_result: ScanResult,
+    progress_callback: ProgressCallback | None = None,
+) -> OrganisationProposal:
     """Build and classify a deterministic, read-only organisation plan."""
     proposed = []
-    for entry in sorted(scan_result.media_entries, key=lambda item: item.path.as_posix()):
+    ordered_entries = sorted(
+        scan_result.media_entries, key=lambda item: item.path.as_posix()
+    )
+    for entry in ordered_entries:
         creation_date = resolve_media_creation_date(entry)
         proposed.append(
             (entry, creation_date, _destination_for(entry, creation_date))
@@ -65,6 +118,16 @@ def generate_organisation_proposal(scan_result: ScanResult) -> OrganisationPropo
             key=Path.as_posix,
         )
     )
+    total_candidates = sum(
+        len(groups[destination]) - 1 for destination in collision_destinations
+    )
+    progress = (
+        _ProgressTracker(total_candidates, progress_callback)
+        if progress_callback is not None and total_candidates > 0
+        else None
+    )
+    if progress is not None:
+        progress.report()
 
     digest_cache: dict[Path, str | None] = {}
     size_cache: dict[Path, int | None] = {}
@@ -103,7 +166,10 @@ def generate_organisation_proposal(scan_result: ScanResult) -> OrganisationPropo
             entry.path,
             size_cache,
             digest_cache,
+            progress.add_hashed_bytes if progress is not None else None,
         )
+        if progress is not None:
+            progress.complete(classification)
         review_key = (normal_destination, classification)
         review_counts[review_key] += 1
         destination = _review_destination(
@@ -130,6 +196,7 @@ def _classify_against_canonical(
     candidate_path: Path,
     size_cache: dict[Path, int | None],
     digest_cache: dict[Path, str | None],
+    on_bytes_hashed: Callable[[int], None] | None = None,
 ) -> PlacementClassification:
     canonical_size = _size(canonical_path, size_cache)
     candidate_size = _size(candidate_path, size_cache)
@@ -139,10 +206,10 @@ def _classify_against_canonical(
     if canonical_size != candidate_size:
         return PlacementClassification.POTENTIAL_CONFLICT
 
-    canonical_digest = _digest(canonical_path, digest_cache)
+    canonical_digest = _digest(canonical_path, digest_cache, on_bytes_hashed)
     if canonical_digest is None:
         return PlacementClassification.UNVERIFIED_CONFLICT
-    candidate_digest = _digest(candidate_path, digest_cache)
+    candidate_digest = _digest(candidate_path, digest_cache, on_bytes_hashed)
     if candidate_digest is None:
         return PlacementClassification.UNVERIFIED_CONFLICT
     if candidate_digest == canonical_digest:
@@ -159,10 +226,19 @@ def _size(path: Path, cache: dict[Path, int | None]) -> int | None:
     return cache[path]
 
 
-def _digest(path: Path, cache: dict[Path, str | None]) -> str | None:
+def _digest(
+    path: Path,
+    cache: dict[Path, str | None],
+    on_bytes_hashed: Callable[[int], None] | None = None,
+) -> str | None:
     if path not in cache:
         try:
-            cache[path] = file_content.sha256_digest(path)
+            if on_bytes_hashed is None:
+                cache[path] = file_content.sha256_digest(path)
+            else:
+                cache[path] = file_content.sha256_digest(
+                    path, on_bytes_read=on_bytes_hashed
+                )
         except OSError:
             cache[path] = None
     return cache[path]

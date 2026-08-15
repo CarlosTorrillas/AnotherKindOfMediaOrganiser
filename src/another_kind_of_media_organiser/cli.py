@@ -2,15 +2,19 @@
 
 import argparse
 import sys
+import time
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from math import ceil
 from pathlib import Path
+from typing import TextIO
 
+from another_kind_of_media_organiser.application.generate_organisation_proposal import (
+    CollisionClassificationProgress,
+    generate_organisation_proposal,
+)
 from another_kind_of_media_organiser.application.scan_media_collection import (
     scan_media_collection,
-)
-from another_kind_of_media_organiser.application.generate_organisation_proposal import (
-    generate_organisation_proposal,
 )
 from another_kind_of_media_organiser.domain.media import MediaCategory, ScanResult
 from another_kind_of_media_organiser.domain.organisation import (
@@ -21,6 +25,107 @@ from another_kind_of_media_organiser.domain.organisation import (
 
 _NO_EXTENSION_LABEL = "[no extension]"
 _MAX_COLLISION_EXAMPLES = 10
+_INTERACTIVE_UPDATE_INTERVAL_SECONDS = 0.2
+_NON_INTERACTIVE_BYTE_MILESTONE = 1024 * 1024 * 1024
+
+
+class _CollisionProgressReporter:
+    def __init__(
+        self,
+        output: TextIO = sys.stderr,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.output = output
+        self.clock = clock
+        self.interactive = output.isatty()
+        self.last_update = float("-inf")
+        self.max_line_length = 0
+        self.next_candidate_milestone = 0
+        self.next_byte_milestone = _NON_INTERACTIVE_BYTE_MILESTONE
+        self.has_output = False
+
+    def __call__(self, progress: CollisionClassificationProgress) -> None:
+        if self.interactive:
+            now = self.clock()
+            is_boundary = progress.processed_candidates in {
+                0,
+                progress.total_candidates,
+            }
+            update_due = (
+                now - self.last_update >= _INTERACTIVE_UPDATE_INTERVAL_SECONDS
+            )
+            if not is_boundary and not update_due:
+                return
+            self.last_update = now
+            self._write_interactive(progress)
+            return
+
+        if not self.has_output:
+            self.next_candidate_milestone = max(
+                1, ceil(progress.total_candidates / 20)
+            )
+            self._write_line(progress)
+            return
+
+        reached_candidate_milestone = (
+            progress.processed_candidates >= self.next_candidate_milestone
+        )
+        reached_byte_milestone = progress.bytes_hashed >= self.next_byte_milestone
+        completed = progress.processed_candidates == progress.total_candidates
+        if reached_candidate_milestone or reached_byte_milestone or completed:
+            self._write_line(progress)
+            while self.next_candidate_milestone <= progress.processed_candidates:
+                self.next_candidate_milestone += max(
+                    1, ceil(progress.total_candidates / 20)
+                )
+            while self.next_byte_milestone <= progress.bytes_hashed:
+                self.next_byte_milestone += _NON_INTERACTIVE_BYTE_MILESTONE
+
+    def cancel(self) -> None:
+        if self.interactive and self.has_output:
+            print(file=self.output)
+
+    def _write_interactive(self, progress: CollisionClassificationProgress) -> None:
+        line = self._format(progress, "Classifying destination collisions")
+        self.max_line_length = max(self.max_line_length, len(line))
+        completed = progress.processed_candidates == progress.total_candidates
+        ending = "\n" if completed else ""
+        print(
+            f"\r{line.ljust(self.max_line_length)}",
+            end=ending,
+            file=self.output,
+            flush=True,
+        )
+        self.has_output = True
+
+    def _write_line(self, progress: CollisionClassificationProgress) -> None:
+        print(
+            self._format(progress, "Collision classification"),
+            file=self.output,
+            flush=True,
+        )
+        self.has_output = True
+
+    @staticmethod
+    def _format(progress: CollisionClassificationProgress, label: str) -> str:
+        percentage = progress.processed_candidates * 100 // progress.total_candidates
+        return (
+            f"{label}: {progress.processed_candidates}/"
+            f"{progress.total_candidates} files "
+            f"({percentage}%) | exact {progress.exact_duplicate_files} | "
+            f"potential {progress.potential_conflict_files} | "
+            f"unverified {progress.unverified_conflict_files} | "
+            f"hashed {_format_bytes(progress.bytes_hashed)}"
+        )
+
+
+def _format_bytes(count: int) -> str:
+    value = float(count)
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if value < 1024 or unit == "TiB":
+            return f"{int(value)} B" if unit == "B" else f"{value:.1f} {unit}"
+        value /= 1024
+    raise AssertionError("unreachable")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -121,10 +226,27 @@ def main(arguments: Sequence[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
+        except KeyboardInterrupt:
+            if parsed_arguments.command != "propose":
+                raise
+            _print_proposal_cancellation()
+            return 130
         if parsed_arguments.command == "scan":
             _print_summary(result)
         else:
-            _print_proposal_summary(generate_organisation_proposal(result))
+            progress_reporter = _CollisionProgressReporter(sys.stderr)
+            try:
+                proposal = generate_organisation_proposal(result, progress_reporter)
+            except KeyboardInterrupt:
+                progress_reporter.cancel()
+                _print_proposal_cancellation()
+                return 130
+            _print_proposal_summary(proposal)
     else:
         print("AnotherKindOfMediaOrganiser")
     return 0
+
+
+def _print_proposal_cancellation() -> None:
+    print("Proposal generation cancelled.", file=sys.stderr)
+    print("No files have been changed.", file=sys.stderr)
