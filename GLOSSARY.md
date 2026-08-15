@@ -61,6 +61,10 @@ A read-only plan showing how Recognised Media could be organised without changin
 
 The placement of one recognised Media Entry within an Organisation Proposal. It identifies the source Media Entry, proposed destination, Media Category, Media Creation Date used for organisation, and whether another Proposed Placement has the same destination.
 
+## Destination Collision
+
+A situation where two or more different Media Entries receive the same proposed destination in an Organisation Proposal. Collision counts represent distinct conflicting destination paths, not the number of Media Entries involved.
+
 ## Ubiquitous language
 
 When a user story introduces or materially changes a domain concept, identify that concept explicitly before implementation. Reuse an existing glossary term where appropriate, or update the glossary with the new agreed meaning.
