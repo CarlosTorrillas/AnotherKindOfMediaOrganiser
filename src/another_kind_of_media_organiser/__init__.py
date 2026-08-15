@@ -1,0 +1,2 @@
+"""AnotherKindOfMediaOrganiser package."""
+

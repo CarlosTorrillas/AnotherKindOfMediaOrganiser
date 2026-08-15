@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "another-kind-of-media-organiser"
+version = "0.1.0"
+description = "A safe, incremental media collection organiser."
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "behave>=1.2.6,<2",
+    "pytest>=8,<9",
+]
+
+[project.scripts]
+media-organiser = "another_kind_of_media_organiser.cli:main"
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
