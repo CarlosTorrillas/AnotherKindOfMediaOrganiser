@@ -28,6 +28,7 @@ def _print_summary(result: ScanResult) -> None:
     print(f"Images: {result.counts_by_category[MediaCategory.IMAGE]}")
     print(f"RAW: {result.counts_by_category[MediaCategory.RAW]}")
     print(f"Videos: {result.counts_by_category[MediaCategory.VIDEO]}")
+    print(f"Audio: {result.counts_by_category[MediaCategory.AUDIO]}")
     print(f"Unsupported: {result.unsupported_files}")
     print(f"Directories scanned: {result.directories_scanned}")
     _print_extension_breakdown("Recognised media", result.recognised_extension_counts)

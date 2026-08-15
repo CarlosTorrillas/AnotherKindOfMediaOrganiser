@@ -13,13 +13,17 @@ class MediaCategory(Enum):
     IMAGE = "IMAGE"
     RAW = "RAW"
     VIDEO = "VIDEO"
+    AUDIO = "AUDIO"
     UNSUPPORTED = "UNSUPPORTED"
 
 
 _EXTENSIONS_BY_CATEGORY = {
-    MediaCategory.IMAGE: frozenset({".jpg", ".jpeg", ".png", ".heic"}),
-    MediaCategory.RAW: frozenset({".arw", ".cr2", ".nef"}),
-    MediaCategory.VIDEO: frozenset({".mp4", ".mov", ".m4v"}),
+    MediaCategory.IMAGE: frozenset(
+        {".jpg", ".jpeg", ".png", ".heic", ".webp", ".tif", ".tiff"}
+    ),
+    MediaCategory.RAW: frozenset({".arw", ".cr2", ".nef", ".dng"}),
+    MediaCategory.VIDEO: frozenset({".mp4", ".mov", ".m4v", ".3gp"}),
+    MediaCategory.AUDIO: frozenset({".mp3", ".aac", ".opus", ".amr"}),
 }
 
 

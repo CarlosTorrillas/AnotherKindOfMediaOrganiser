@@ -91,6 +91,46 @@ def step_file_media_collection(context) -> None:
     context.scan_location.touch()
 
 
+@given("a Media Collection containing WEBP and TIFF images")
+def step_additional_image_formats(context) -> None:
+    root = _make_directory(context)
+    for filename in ("photo.webp", "scan.tif", "archive.tiff"):
+        _create_file(root, filename)
+
+
+@given("a Media Collection containing a DNG file")
+def step_dng_file(context) -> None:
+    root = _make_directory(context)
+    _create_file(root, "negative.dng")
+
+
+@given("a Media Collection containing a 3GP file")
+def step_3gp_file(context) -> None:
+    root = _make_directory(context)
+    _create_file(root, "recording.3gp")
+
+
+@given("a Media Collection containing MP3, AAC, OPUS and AMR files")
+def step_audio_formats(context) -> None:
+    root = _make_directory(context)
+    for filename in ("song.mp3", "sound.aac", "voice.opus", "message.amr"):
+        _create_file(root, filename)
+
+
+@given("a Media Collection containing mixed-case new media formats")
+def step_mixed_case_new_formats(context) -> None:
+    root = _make_directory(context)
+    for filename in ("photo.WeBp", "negative.DnG", "clip.3Gp", "voice.OpUs"):
+        _create_file(root, filename)
+
+
+@given("a Media Collection containing deliberately unsupported formats")
+def step_deliberately_unsupported_formats(context) -> None:
+    root = _make_directory(context)
+    for filename in ("stereo.mpo", "graphic.svg", "sidecar.xmp", "cloud.icloud"):
+        _create_file(root, filename)
+
+
 @when("the user scans the directory")
 def step_scan_directory(context) -> None:
     context.result = scan_media_collection(context.scan_root)
@@ -147,11 +187,9 @@ def step_nested_files_included(context) -> None:
 
 @then("the media counts are {images:d} images, {raw:d} RAW file, and {videos:d} video")
 def step_media_counts(context, images: int, raw: int, videos: int) -> None:
-    assert context.result.counts_by_category == {
-        MediaCategory.IMAGE: images,
-        MediaCategory.RAW: raw,
-        MediaCategory.VIDEO: videos,
-    }
+    assert context.result.counts_by_category[MediaCategory.IMAGE] == images
+    assert context.result.counts_by_category[MediaCategory.RAW] == raw
+    assert context.result.counts_by_category[MediaCategory.VIDEO] == videos
 
 
 @then("the media counts are {images:d} image, {raw:d} RAW file, and {videos:d} video")
@@ -227,3 +265,23 @@ def step_no_traceback(context) -> None:
 @then("the scan command returns a non-zero exit code")
 def step_nonzero_exit_code(context) -> None:
     assert context.exit_code != 0
+
+
+@then("{count:d} files are recognised as {category} media")
+def step_files_recognised_as_category(context, count: int, category: str) -> None:
+    assert context.result.counts_by_category[MediaCategory[category]] == count
+
+
+@then("{count:d} file is recognised as {category} media")
+def step_file_recognised_as_category(context, count: int, category: str) -> None:
+    step_files_recognised_as_category(context, count, category)
+
+
+@then("the scan reports {count:d} audio files")
+def step_audio_file_count(context, count: int) -> None:
+    assert context.result.counts_by_category[MediaCategory.AUDIO] == count
+
+
+@then("the recognised extension breakdown is empty")
+def step_empty_recognised_extension_breakdown(context) -> None:
+    assert context.result.recognised_extension_counts == {}

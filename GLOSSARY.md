@@ -25,14 +25,21 @@ The logical classification assigned to recognised media. The currently supported
 - `IMAGE`
 - `RAW`
 - `VIDEO`
+- `AUDIO`
+
+Media in this application is broader than photographs and video. It includes recognised image, RAW image, video, and audio assets that may be valuable to the user.
+
+## Media Format
+
+The concrete format of a media file, currently identified by its normalised File Extension. For example, `.mp3`, `.aac`, `.opus`, and `.amr` are distinct Media Formats within the `AUDIO` Media Category. Media Format and Media Category are not interchangeable concepts.
 
 ## File Extension
 
-The normalised, lowercase filename suffix used to classify and report a discovered file type, such as `.jpg` or `.xmp`. A leading-dot filename without another suffix, such as `.DS_Store`, is retained as an extension-like file type and reported in lowercase. A File Extension is distinct from a Media Category: multiple extensions may belong to the same category. Files without an extension are retained in reporting and shown to users as `[no extension]`; that label does not represent a real extension.
+The normalised, lowercase filename suffix currently used to identify a Media Format and report a discovered file type, such as `.jpg` or `.xmp`. A leading-dot filename without another suffix, such as `.DS_Store`, is retained as an extension-like file type and reported in lowercase. A File Extension is distinct from both a Media Format and a Media Category: it is the application's current identification mechanism. Files without an extension are retained in reporting and shown to users as `[no extension]`; that label does not represent a real extension.
 
 ## Recognised Media
 
-A file that the application currently knows how to classify as supported media based on its filename extension. Extension matching is case-insensitive.
+A file whose Media Format the application currently supports and can assign to a Media Category. Recognition is currently based on case-insensitive File Extension matching.
 
 ## Unsupported File
 

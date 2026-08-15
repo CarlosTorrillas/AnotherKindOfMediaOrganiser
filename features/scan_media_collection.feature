@@ -122,3 +122,38 @@ Feature: Scan a media collection safely
     Then the error reports that the location is not a valid directory
     And no Python traceback is shown
     And the scan command returns a non-zero exit code
+
+  Scenario: Recognise additional image formats
+    Given a Media Collection containing WEBP and TIFF images
+    When the user scans the Media Collection
+    Then 3 files are recognised as IMAGE media
+
+  Scenario: Recognise DNG as RAW
+    Given a Media Collection containing a DNG file
+    When the user scans the Media Collection
+    Then 1 file is recognised as RAW media
+
+  Scenario: Recognise 3GP as video
+    Given a Media Collection containing a 3GP file
+    When the user scans the Media Collection
+    Then 1 file is recognised as VIDEO media
+
+  Scenario: Recognise audio media
+    Given a Media Collection containing MP3, AAC, OPUS and AMR files
+    When the user scans the Media Collection
+    Then 4 files are recognised as AUDIO media
+    And the scan reports 4 audio files
+
+  Scenario: New media formats are case-insensitive
+    Given a Media Collection containing mixed-case new media formats
+    When the user scans the Media Collection
+    Then 1 file is recognised as IMAGE media
+    And 1 file is recognised as RAW media
+    And 1 file is recognised as VIDEO media
+    And 1 file is recognised as AUDIO media
+
+  Scenario: Unsupported formats remain unsupported
+    Given a Media Collection containing deliberately unsupported formats
+    When the user scans the Media Collection
+    Then the scan reports 4 unsupported files
+    And the recognised extension breakdown is empty
