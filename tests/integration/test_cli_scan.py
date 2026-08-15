@@ -8,6 +8,10 @@ def test_scan_command_prints_a_concise_summary(tmp_path: Path, capsys) -> None:
     (tmp_path / "portrait.JPG").touch()
     (tmp_path / "negative.arw").touch()
     (tmp_path / "movie.mov").touch()
+    (tmp_path / "picture.webp").touch()
+    (tmp_path / "camera.dng").touch()
+    (tmp_path / "recording.3gp").touch()
+    (tmp_path / "voice.opus").touch()
     (tmp_path / "notes.txt").touch()
     (tmp_path / "data.TXT").touch()
     (tmp_path / ".DS_Store").touch()
@@ -17,18 +21,23 @@ def test_scan_command_prints_a_concise_summary(tmp_path: Path, capsys) -> None:
 
     assert exit_code == 0
     assert capsys.readouterr().out == (
-        "Files scanned: 8\n"
-        "Media files: 4\n"
-        "Images: 2\n"
-        "RAW: 1\n"
-        "Videos: 1\n"
+        "Files scanned: 12\n"
+        "Media files: 8\n"
+        "Images: 3\n"
+        "RAW: 2\n"
+        "Videos: 2\n"
+        "Audio: 1\n"
         "Unsupported: 4\n"
         "Directories scanned: 1\n"
         "\n"
         "Recognised media:\n"
         ".jpg: 2\n"
+        ".3gp: 1\n"
         ".arw: 1\n"
+        ".dng: 1\n"
         ".mov: 1\n"
+        ".opus: 1\n"
+        ".webp: 1\n"
         "\n"
         "Unsupported:\n"
         ".txt: 2\n"
