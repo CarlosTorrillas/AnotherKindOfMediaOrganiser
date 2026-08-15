@@ -35,10 +35,12 @@ def resolve_media_creation_date(media_entry: MediaEntry) -> datetime:
 
 def generate_organisation_proposal(scan_result: ScanResult) -> OrganisationProposal:
     """Build a deterministic, read-only plan for every recognised Media Entry."""
-    proposed = [
-        (entry, resolve_media_creation_date(entry), _destination_for(entry))
-        for entry in sorted(scan_result.media_entries, key=lambda item: item.path.as_posix())
-    ]
+    proposed = []
+    for entry in sorted(scan_result.media_entries, key=lambda item: item.path.as_posix()):
+        creation_date = resolve_media_creation_date(entry)
+        proposed.append(
+            (entry, creation_date, _destination_for(entry, creation_date))
+        )
     destination_counts = Counter(destination for _, _, destination in proposed)
     collision_destinations = tuple(
         sorted(
@@ -63,8 +65,7 @@ def generate_organisation_proposal(scan_result: ScanResult) -> OrganisationPropo
     return OrganisationProposal(placements, collision_destinations)
 
 
-def _destination_for(media_entry: MediaEntry) -> Path:
-    creation_date = resolve_media_creation_date(media_entry)
+def _destination_for(media_entry: MediaEntry, creation_date: datetime) -> Path:
     month = f"{creation_date.month:02d}-{_ENGLISH_MONTH_NAMES[creation_date.month]}"
     return Path(
         str(creation_date.year),
@@ -72,4 +73,3 @@ def _destination_for(media_entry: MediaEntry) -> Path:
         media_entry.category.value,
         media_entry.path.name,
     )
-
