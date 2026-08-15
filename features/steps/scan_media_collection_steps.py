@@ -23,7 +23,7 @@ def _create_file(root: Path, relative_path: str) -> None:
     path.write_bytes(b"test fixture")
 
 
-@given("a directory containing these supported media files")
+@given("a directory containing these supported media files:")
 def step_supported_media_files(context) -> None:
     root = _make_directory(context)
     for row in context.table:
@@ -83,6 +83,11 @@ def step_media_files(context, count: int) -> None:
     assert context.result.media_files == count
 
 
+@then("the scan reports {count:d} recognised media file")
+def step_single_media_file(context, count: int) -> None:
+    step_media_files(context, count)
+
+
 @then("the scan reports {count:d} unsupported files")
 def step_unsupported_files(context, count: int) -> None:
     assert context.result.unsupported_files == count
@@ -120,4 +125,3 @@ def step_singular_media_counts(context, images: int, raw: int, videos: int) -> N
 def step_symlink_not_followed(context) -> None:
     assert context.result.total_files == 0
     assert context.result.directories_scanned == 1
-
