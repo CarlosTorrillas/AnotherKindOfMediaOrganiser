@@ -49,11 +49,17 @@ A file encountered during a Scan that is not currently classified as Recognised 
 
 The filesystem timestamp currently used as the available date source for a Media Entry. This is an interim source that may later be replaced or complemented by embedded media metadata.
 
+## Media Creation Date
+
+The date that best represents when media was originally created or captured. Organisation Proposals use this concept to determine year and month. It is currently resolved from the Filesystem Modification Date as a temporary fallback; future metadata-aware resolution may replace that source without changing what Media Creation Date means.
+
 ## Organisation Proposal
 
-**Future concept — not implemented yet.**
+A read-only plan showing how Recognised Media could be organised without changing the source Media Collection. It contains one Proposed Placement for every recognised Media Entry and reports proposed destinations that collide. Generating a proposal performs no organisation operation.
 
-A read-only representation of how Recognised Media could be organised without changing the source Media Collection. Its detailed model has not yet been defined.
+## Proposed Placement
+
+The placement of one recognised Media Entry within an Organisation Proposal. It identifies the source Media Entry, proposed destination, Media Category, Media Creation Date used for organisation, and whether another Proposed Placement has the same destination.
 
 ## Ubiquitous language
 
