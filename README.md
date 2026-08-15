@@ -2,7 +2,7 @@
 
 AnotherKindOfMediaOrganiser will help people inspect and safely organise photo and video collections into a predictable year, month, and media-type structure.
 
-The project is currently at the bootstrap stage. It does not scan or modify media. The only application behaviour is a small CLI that identifies the application.
+The project is in early development. It can recursively scan a media directory and report supported images, RAW files, videos, unsupported files, directories visited, and filesystem modification dates. Scanning is read-only and symbolic links are not followed.
 
 ## Requirements and setup
 
@@ -20,9 +20,12 @@ Run the application and test suites:
 
 ```bash
 media-organiser
+media-organiser scan /path/to/media
 pytest
 behave
 ```
+
+The initial supported extensions are `.jpg`, `.jpeg`, `.png`, `.heic`, `.arw`, `.cr2`, `.nef`, `.mp4`, `.mov`, and `.m4v`, matched case-insensitively. Other files are reported as unsupported rather than silently ignored.
 
 ## Architecture
 
@@ -34,5 +37,4 @@ Unit and integration tests live under `tests/`; Gherkin features and Behave step
 
 Work proceeds in small, focused changes using BDD, TDD, and Red → Green → Refactor. Tests describe observable behaviour, production code uses type hints, and feature branches are reviewed through pull requests.
 
-Safety is foundational: scan before modification, analyse before acting, propose changes before performing them, copy before moving or deleting originals, and explicitly validate destructive operations. The application currently performs no filesystem or media operations.
-
+Safety is foundational: scan before modification, analyse before acting, propose changes before performing them, copy before moving or deleting originals, and explicitly validate destructive operations. The current scanner only reads directory entries, file metadata, and supported filenames; it does not alter the scanned tree.
