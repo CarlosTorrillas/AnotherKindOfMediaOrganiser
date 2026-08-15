@@ -68,9 +68,21 @@ def step_directory_symlink(context) -> None:
         context.scenario.skip(f"Symbolic links are unavailable: {error}")
 
 
+@given("a Media Collection containing these files:")
+def step_media_collection_files(context) -> None:
+    root = _make_directory(context)
+    for row in context.table:
+        _create_file(root, row["filename"])
+
+
 @when("the user scans the directory")
 def step_scan_directory(context) -> None:
     context.result = scan_media_collection(context.scan_root)
+
+
+@when("the user scans the Media Collection")
+def step_scan_media_collection(context) -> None:
+    step_scan_directory(context)
 
 
 @then("the scan reports {count:d} total files")
@@ -125,3 +137,49 @@ def step_singular_media_counts(context, images: int, raw: int, videos: int) -> N
 def step_symlink_not_followed(context) -> None:
     assert context.result.total_files == 0
     assert context.result.directories_scanned == 1
+
+
+def _extension_counts_from_table(context) -> dict[str, int]:
+    return {
+        "" if row["extension"] == "[no extension]" else row["extension"]: int(
+            row["count"]
+        )
+        for row in context.table
+    }
+
+
+@then("the recognised extension breakdown is:")
+def step_recognised_extension_breakdown(context) -> None:
+    assert context.result.recognised_extension_counts == _extension_counts_from_table(
+        context
+    )
+
+
+@then("the unsupported extension breakdown is:")
+def step_unsupported_extension_breakdown(context) -> None:
+    assert context.result.unsupported_extension_counts == _extension_counts_from_table(
+        context
+    )
+
+
+@then("recognised extension counts equal recognised media files")
+def step_recognised_extension_invariant(context) -> None:
+    assert sum(context.result.recognised_extension_counts.values()) == (
+        context.result.media_files
+    )
+
+
+@then("unsupported extension counts equal unsupported files")
+def step_unsupported_extension_invariant(context) -> None:
+    assert sum(context.result.unsupported_extension_counts.values()) == (
+        context.result.unsupported_files
+    )
+
+
+@then("all extension counts equal total files")
+def step_all_extension_invariant(context) -> None:
+    assert (
+        sum(context.result.recognised_extension_counts.values())
+        + sum(context.result.unsupported_extension_counts.values())
+        == context.result.total_files
+    )

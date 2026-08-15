@@ -23,9 +23,19 @@ _EXTENSIONS_BY_CATEGORY = {
 }
 
 
+def normalise_file_extension(filename: str | Path) -> str:
+    """Return a lowercase extension, retaining extension-like dotfile names."""
+    path = Path(filename)
+    if path.suffix:
+        return path.suffix.lower()
+    if path.name.startswith(".") and len(path.name) > 1:
+        return path.name.lower()
+    return ""
+
+
 def classify_media(filename: str | Path) -> MediaCategory:
     """Classify a filename using its case-insensitive extension."""
-    extension = Path(filename).suffix.lower()
+    extension = normalise_file_extension(filename)
     for category, extensions in _EXTENSIONS_BY_CATEGORY.items():
         if extension in extensions:
             return category
@@ -49,10 +59,11 @@ class ScanResult:
     unsupported_files: int
     directories_scanned: int
     counts_by_category: Mapping[MediaCategory, int]
+    recognised_extension_counts: Mapping[str, int]
+    unsupported_extension_counts: Mapping[str, int]
     media_entries: tuple[MediaEntry, ...]
 
     @property
     def media_files(self) -> int:
         """Return the number of recognised media files."""
         return len(self.media_entries)
-

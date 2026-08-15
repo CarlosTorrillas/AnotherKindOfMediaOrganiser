@@ -44,3 +44,67 @@ Feature: Scan a media collection safely
     When the user scans the directory
     Then the symbolic link is not recursively followed
 
+  Scenario: Report recognised file extensions
+    Given a Media Collection containing these files:
+      | filename       |
+      | first.jpg      |
+      | second.jpeg    |
+      | negative.arw   |
+      | recording.mp4  |
+    When the user scans the Media Collection
+    Then the recognised extension breakdown is:
+      | extension | count |
+      | .jpg      | 1     |
+      | .jpeg     | 1     |
+      | .arw      | 1     |
+      | .mp4      | 1     |
+
+  Scenario: Report unsupported file extensions
+    Given a Media Collection containing these files:
+      | filename  |
+      | sidecar.xmp |
+      | edit.aae  |
+      | notes.pdf |
+    When the user scans the Media Collection
+    Then the unsupported extension breakdown is:
+      | extension | count |
+      | .xmp      | 1     |
+      | .aae      | 1     |
+      | .pdf      | 1     |
+
+  Scenario: Extension counts are case-insensitive
+    Given a Media Collection containing these files:
+      | filename     |
+      | first.jpg    |
+      | second.JPG   |
+      | third.JpG    |
+      | first.XMP    |
+      | second.xmp   |
+    When the user scans the Media Collection
+    Then the recognised extension breakdown is:
+      | extension | count |
+      | .jpg      | 3     |
+    And the unsupported extension breakdown is:
+      | extension | count |
+      | .xmp      | 2     |
+
+  Scenario: Report files without extensions
+    Given a Media Collection containing these files:
+      | filename |
+      | README   |
+    When the user scans the Media Collection
+    Then the unsupported extension breakdown is:
+      | extension      | count |
+      | [no extension] | 1     |
+
+  Scenario: Extension totals remain consistent with scan totals
+    Given a Media Collection containing these files:
+      | filename      |
+      | photo.jpg     |
+      | portrait.PNG  |
+      | sidecar.xmp   |
+      | README        |
+    When the user scans the Media Collection
+    Then recognised extension counts equal recognised media files
+    And unsupported extension counts equal unsupported files
+    And all extension counts equal total files

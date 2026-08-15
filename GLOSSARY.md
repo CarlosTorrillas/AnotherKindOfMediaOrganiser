@@ -12,7 +12,7 @@ A read-only inspection of a Media Collection. A Scan gathers information about t
 
 ## Scan Result
 
-The information produced by a Scan. It currently summarises the total files encountered, recognised media, unsupported files, directories scanned, media counts by category, and discovered Media Entries.
+The information produced by a Scan. It currently summarises the total files encountered, recognised media, unsupported files, directories scanned, media counts by category, discovered File Extensions, and discovered Media Entries.
 
 ## Media Entry
 
@@ -25,6 +25,10 @@ The logical classification assigned to recognised media. The currently supported
 - `IMAGE`
 - `RAW`
 - `VIDEO`
+
+## File Extension
+
+The normalised, lowercase filename suffix used to classify and report a discovered file type, such as `.jpg` or `.xmp`. A leading-dot filename without another suffix, such as `.DS_Store`, is retained as an extension-like file type and reported in lowercase. A File Extension is distinct from a Media Category: multiple extensions may belong to the same category. Files without an extension are retained in reporting and shown to users as `[no extension]`; that label does not represent a real extension.
 
 ## Recognised Media
 
@@ -49,4 +53,3 @@ A read-only representation of how Recognised Media could be organised without ch
 When a user story introduces or materially changes a domain concept, identify that concept explicitly before implementation. Reuse an existing glossary term where appropriate, or update the glossary with the new agreed meaning.
 
 Use these terms consistently in user stories, tests, code, and documentation so implementation terminology does not drift away from product terminology. Avoid introducing synonyms for an existing concept unless their product meanings genuinely differ. For example, do not replace Media Collection casually with terms such as “Media Root”, “Source Library”, “Input Folder”, or “Media Repository”.
-
