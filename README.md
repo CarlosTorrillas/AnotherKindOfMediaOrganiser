@@ -33,8 +33,12 @@ Production code uses a `src` layout. The package has lightweight `domain`, `appl
 
 Unit and integration tests live under `tests/`; Gherkin features and Behave step definitions live under `features/`.
 
+The shared application vocabulary is defined in the [domain glossary](GLOSSARY.md).
+
 ## Development approach
 
 Work proceeds in small, focused changes using BDD, TDD, and Red → Green → Refactor. Tests describe observable behaviour, production code uses type hints, and feature branches are reviewed through pull requests.
+
+GitHub Actions installs the project under Python 3.13 and runs both pytest and Behave for pushes and pull requests.
 
 Safety is foundational: scan before modification, analyse before acting, propose changes before performing them, copy before moving or deleting originals, and explicitly validate destructive operations. The current scanner only reads directory entries, file metadata, and supported filenames; it does not alter the scanned tree.
