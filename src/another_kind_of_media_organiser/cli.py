@@ -1,6 +1,7 @@
 """Command-line interface for AnotherKindOfMediaOrganiser."""
 
 import argparse
+import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -47,7 +48,14 @@ def main(arguments: Sequence[str] | None = None) -> int:
     """Run the command-line interface."""
     parsed_arguments = _build_parser().parse_args(arguments)
     if parsed_arguments.command == "scan":
-        result = scan_media_collection(parsed_arguments.directory)
+        try:
+            result = scan_media_collection(parsed_arguments.directory)
+        except NotADirectoryError:
+            print(
+                f"Error: '{parsed_arguments.directory}' is not a valid directory.",
+                file=sys.stderr,
+            )
+            return 2
         _print_summary(result)
     else:
         print("AnotherKindOfMediaOrganiser")
