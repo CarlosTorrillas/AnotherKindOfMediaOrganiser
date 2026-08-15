@@ -34,6 +34,7 @@ def test_scan_summarises_supported_and_unsupported_files(tmp_path: Path) -> None
         MediaCategory.IMAGE: 2,
         MediaCategory.RAW: 1,
         MediaCategory.VIDEO: 1,
+        MediaCategory.AUDIO: 0,
     }
 
 
@@ -89,4 +90,3 @@ def test_scan_does_not_follow_directory_symlinks(tmp_path: Path) -> None:
     assert result.total_files == 0
     assert result.directories_scanned == 1
     assert result.media_entries == ()
-

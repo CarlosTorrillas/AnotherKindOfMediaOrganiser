@@ -187,11 +187,9 @@ def step_nested_files_included(context) -> None:
 
 @then("the media counts are {images:d} images, {raw:d} RAW file, and {videos:d} video")
 def step_media_counts(context, images: int, raw: int, videos: int) -> None:
-    assert context.result.counts_by_category == {
-        MediaCategory.IMAGE: images,
-        MediaCategory.RAW: raw,
-        MediaCategory.VIDEO: videos,
-    }
+    assert context.result.counts_by_category[MediaCategory.IMAGE] == images
+    assert context.result.counts_by_category[MediaCategory.RAW] == raw
+    assert context.result.counts_by_category[MediaCategory.VIDEO] == videos
 
 
 @then("the media counts are {images:d} image, {raw:d} RAW file, and {videos:d} video")

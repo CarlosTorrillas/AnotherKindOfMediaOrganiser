@@ -61,6 +61,7 @@ def scan_directory(root: Path) -> ScanResult:
             MediaCategory.IMAGE,
             MediaCategory.RAW,
             MediaCategory.VIDEO,
+            MediaCategory.AUDIO,
         )
     }
     return ScanResult(
