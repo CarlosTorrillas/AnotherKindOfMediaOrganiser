@@ -108,3 +108,17 @@ Feature: Scan a media collection safely
     Then recognised extension counts equal recognised media files
     And unsupported extension counts equal unsupported files
     And all extension counts equal total files
+
+  Scenario: Scan a location that does not exist
+    Given a Media Collection location that does not exist
+    When the user attempts to scan the location
+    Then the error reports that the location is not a valid directory
+    And no Python traceback is shown
+    And the scan command returns a non-zero exit code
+
+  Scenario: Scan a file instead of a directory
+    Given a Media Collection location that refers to a file
+    When the user attempts to scan the location
+    Then the error reports that the location is not a valid directory
+    And no Python traceback is shown
+    And the scan command returns a non-zero exit code

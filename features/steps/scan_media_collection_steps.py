@@ -1,4 +1,6 @@
 import tempfile
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 from behave import given, then, when
@@ -6,6 +8,7 @@ from behave import given, then, when
 from another_kind_of_media_organiser.application.scan_media_collection import (
     scan_media_collection,
 )
+from another_kind_of_media_organiser.cli import main
 from another_kind_of_media_organiser.domain.media import MediaCategory
 
 
@@ -75,6 +78,19 @@ def step_media_collection_files(context) -> None:
         _create_file(root, row["filename"])
 
 
+@given("a Media Collection location that does not exist")
+def step_missing_media_collection(context) -> None:
+    root = _make_directory(context)
+    context.scan_location = root / "missing"
+
+
+@given("a Media Collection location that refers to a file")
+def step_file_media_collection(context) -> None:
+    root = _make_directory(context)
+    context.scan_location = root / "photo.jpg"
+    context.scan_location.touch()
+
+
 @when("the user scans the directory")
 def step_scan_directory(context) -> None:
     context.result = scan_media_collection(context.scan_root)
@@ -83,6 +99,16 @@ def step_scan_directory(context) -> None:
 @when("the user scans the Media Collection")
 def step_scan_media_collection(context) -> None:
     step_scan_directory(context)
+
+
+@when("the user attempts to scan the location")
+def step_attempt_scan_location(context) -> None:
+    standard_output = StringIO()
+    standard_error = StringIO()
+    with redirect_stdout(standard_output), redirect_stderr(standard_error):
+        context.exit_code = main(["scan", str(context.scan_location)])
+    context.standard_output = standard_output.getvalue()
+    context.standard_error = standard_error.getvalue()
 
 
 @then("the scan reports {count:d} total files")
@@ -183,3 +209,21 @@ def step_all_extension_invariant(context) -> None:
         + sum(context.result.unsupported_extension_counts.values())
         == context.result.total_files
     )
+
+
+@then("the error reports that the location is not a valid directory")
+def step_invalid_directory_error(context) -> None:
+    assert context.standard_error == (
+        f"Error: '{context.scan_location}' is not a valid directory.\n"
+    )
+    assert context.standard_output == ""
+
+
+@then("no Python traceback is shown")
+def step_no_traceback(context) -> None:
+    assert "Traceback" not in context.standard_error
+
+
+@then("the scan command returns a non-zero exit code")
+def step_nonzero_exit_code(context) -> None:
+    assert context.exit_code != 0
