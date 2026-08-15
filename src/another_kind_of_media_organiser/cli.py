@@ -13,7 +13,10 @@ from another_kind_of_media_organiser.application.generate_organisation_proposal 
     generate_organisation_proposal,
 )
 from another_kind_of_media_organiser.domain.media import MediaCategory, ScanResult
-from another_kind_of_media_organiser.domain.organisation import OrganisationProposal
+from another_kind_of_media_organiser.domain.organisation import (
+    OrganisationProposal,
+    PlacementClassification,
+)
 
 
 _NO_EXTENSION_LABEL = "[no extension]"
@@ -60,7 +63,10 @@ def _print_proposal_summary(proposal: OrganisationProposal) -> None:
     print("No files have been changed.")
     print(f"\nMedia files: {len(proposal.placements)}")
     print(f"Proposed destinations: {len(proposal.placements)}")
-    print(f"Collisions: {len(proposal.collision_destinations)}")
+    print(f"Destination collisions: {len(proposal.collision_destinations)}")
+    print(f"Exact duplicate files: {proposal.exact_duplicate_files}")
+    print(f"Potential conflict files: {proposal.potential_conflict_files}")
+    print(f"Unverified conflict files: {proposal.unverified_conflict_files}")
     print("\nYears:")
     year_counts = Counter(
         placement.media_creation_date.year for placement in proposal.placements
@@ -81,13 +87,23 @@ def _print_collision_examples(proposal: OrganisationProposal) -> None:
     print("\nCollision examples:")
     for destination in displayed_destinations:
         print(f"\n{destination}")
-        source_paths = sorted(
-            placement.source.path
-            for placement in proposal.placements
-            if placement.destination == destination
+        collision_placements = sorted(
+            (
+                placement
+                for placement in proposal.placements
+                if placement.normal_destination == destination
+            ),
+            key=lambda placement: placement.source.path,
         )
-        for source_path in source_paths:
-            print(f"  - {source_path}")
+        for placement in collision_placements:
+            label = {
+                PlacementClassification.CANONICAL: "canonical",
+                PlacementClassification.EXACT_DUPLICATE: "exact duplicate",
+                PlacementClassification.POTENTIAL_CONFLICT: "potential conflict",
+                PlacementClassification.UNVERIFIED_CONFLICT: "unverified conflict",
+            }[placement.classification]
+            print(f"  {label}:")
+            print(f"    {placement.source.path}")
     print(
         f"\nShowing {len(displayed_destinations)} of {total_collisions} collisions"
     )
