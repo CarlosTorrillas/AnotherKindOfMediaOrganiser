@@ -67,6 +67,8 @@ def generate_organisation_proposal(scan_result: ScanResult) -> OrganisationPropo
     )
 
     digest_cache: dict[Path, str | None] = {}
+    size_cache: dict[Path, int | None] = {}
+    review_counts: Counter[tuple[Path, PlacementClassification]] = Counter()
     placements = []
     for entry, creation_date, normal_destination in proposed:
         group = groups[normal_destination]
@@ -99,17 +101,15 @@ def generate_organisation_proposal(scan_result: ScanResult) -> OrganisationPropo
         classification = _classify_against_canonical(
             group[0][0].path,
             entry.path,
+            size_cache,
             digest_cache,
         )
-        earlier_same_classification = sum(
-            placement.normal_destination == normal_destination
-            and placement.classification is classification
-            for placement in placements
-        )
+        review_key = (normal_destination, classification)
+        review_counts[review_key] += 1
         destination = _review_destination(
             normal_destination,
             classification,
-            earlier_same_classification + 1,
+            review_counts[review_key],
         )
         placements.append(
             _placement(
@@ -128,12 +128,12 @@ def generate_organisation_proposal(scan_result: ScanResult) -> OrganisationPropo
 def _classify_against_canonical(
     canonical_path: Path,
     candidate_path: Path,
+    size_cache: dict[Path, int | None],
     digest_cache: dict[Path, str | None],
 ) -> PlacementClassification:
-    try:
-        canonical_size = file_content.file_size(canonical_path)
-        candidate_size = file_content.file_size(candidate_path)
-    except OSError:
+    canonical_size = _size(canonical_path, size_cache)
+    candidate_size = _size(candidate_path, size_cache)
+    if canonical_size is None or candidate_size is None:
         return PlacementClassification.UNVERIFIED_CONFLICT
 
     if canonical_size != candidate_size:
@@ -148,6 +148,15 @@ def _classify_against_canonical(
     if candidate_digest == canonical_digest:
         return PlacementClassification.EXACT_DUPLICATE
     return PlacementClassification.POTENTIAL_CONFLICT
+
+
+def _size(path: Path, cache: dict[Path, int | None]) -> int | None:
+    if path not in cache:
+        try:
+            cache[path] = file_content.file_size(path)
+        except OSError:
+            cache[path] = None
+    return cache[path]
 
 
 def _digest(path: Path, cache: dict[Path, str | None]) -> str | None:
