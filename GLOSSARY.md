@@ -28,7 +28,7 @@ The logical classification assigned to recognised media. The currently supported
 
 ## File Extension
 
-The normalised, lowercase filename suffix used to classify and report a discovered file type, such as `.jpg` or `.xmp`. A File Extension is distinct from a Media Category: multiple extensions may belong to the same category. Files without an extension are retained in reporting and shown to users as `[no extension]`; that label does not represent a real extension.
+The normalised, lowercase filename suffix used to classify and report a discovered file type, such as `.jpg` or `.xmp`. A leading-dot filename without another suffix, such as `.DS_Store`, is retained as an extension-like file type and reported in lowercase. A File Extension is distinct from a Media Category: multiple extensions may belong to the same category. Files without an extension are retained in reporting and shown to users as `[no extension]`; that label does not represent a real extension.
 
 ## Recognised Media
 

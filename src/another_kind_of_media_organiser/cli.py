@@ -1,13 +1,16 @@
 """Command-line interface for AnotherKindOfMediaOrganiser."""
 
 import argparse
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from another_kind_of_media_organiser.application.scan_media_collection import (
     scan_media_collection,
 )
 from another_kind_of_media_organiser.domain.media import MediaCategory, ScanResult
+
+
+_NO_EXTENSION_LABEL = "[no extension]"
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -26,6 +29,18 @@ def _print_summary(result: ScanResult) -> None:
     print(f"Videos: {result.counts_by_category[MediaCategory.VIDEO]}")
     print(f"Unsupported: {result.unsupported_files}")
     print(f"Directories scanned: {result.directories_scanned}")
+    _print_extension_breakdown("Recognised media", result.recognised_extension_counts)
+    _print_extension_breakdown("Unsupported", result.unsupported_extension_counts)
+
+
+def _print_extension_breakdown(title: str, counts: Mapping[str, int]) -> None:
+    print(f"\n{title}:")
+    labelled_counts = [
+        (extension or _NO_EXTENSION_LABEL, count)
+        for extension, count in counts.items()
+    ]
+    for label, count in sorted(labelled_counts, key=lambda item: (-item[1], item[0])):
+        print(f"{label}: {count}")
 
 
 def main(arguments: Sequence[str] | None = None) -> int:
