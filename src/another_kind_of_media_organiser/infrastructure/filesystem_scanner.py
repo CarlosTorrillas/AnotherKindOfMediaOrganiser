@@ -57,12 +57,8 @@ def scan_directory(root: Path) -> ScanResult:
 
     counts_by_category = {
         category: category_counts[category]
-        for category in (
-            MediaCategory.IMAGE,
-            MediaCategory.RAW,
-            MediaCategory.VIDEO,
-            MediaCategory.AUDIO,
-        )
+        for category in MediaCategory
+        if category is not MediaCategory.UNSUPPORTED
     }
     return ScanResult(
         total_files=total_files,
