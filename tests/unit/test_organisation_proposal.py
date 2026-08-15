@@ -11,6 +11,7 @@ from another_kind_of_media_organiser.domain.media import (
     MediaEntry,
     ScanResult,
 )
+from another_kind_of_media_organiser.domain.organisation import PlacementClassification
 
 
 def entry(path: str, category: MediaCategory, date: datetime) -> MediaEntry:
@@ -67,10 +68,16 @@ def test_excludes_unsupported_files_from_proposal() -> None:
     assert proposal.placements[0].source == media
 
 
-def test_reports_collisions_without_discarding_or_renaming_entries() -> None:
+def test_reports_collisions_without_discarding_entries(tmp_path: Path) -> None:
     date = datetime(2024, 8, 1, tzinfo=timezone.utc)
-    first = entry("camera-a/IMG_001.jpg", MediaCategory.IMAGE, date)
-    second = entry("camera-b/IMG_001.jpg", MediaCategory.IMAGE, date)
+    first_path = tmp_path / "camera-a/IMG_001.jpg"
+    second_path = tmp_path / "camera-b/IMG_001.jpg"
+    first_path.parent.mkdir()
+    second_path.parent.mkdir()
+    first_path.write_bytes(b"identical")
+    second_path.write_bytes(b"identical")
+    first = entry(str(first_path), MediaCategory.IMAGE, date)
+    second = entry(str(second_path), MediaCategory.IMAGE, date)
 
     proposal = generate_organisation_proposal(scan_result((second, first)))
 
@@ -78,10 +85,14 @@ def test_reports_collisions_without_discarding_or_renaming_entries() -> None:
     assert tuple(placement.source for placement in proposal.placements) == (first, second)
     assert tuple(placement.destination for placement in proposal.placements) == (
         expected_destination,
-        expected_destination,
+        Path("2024/08-August/IMAGE/exactDuplicates/IMG_001__dup1.jpg"),
     )
     assert proposal.collision_destinations == (expected_destination,)
     assert all(placement.has_collision for placement in proposal.placements)
+    assert tuple(placement.classification for placement in proposal.placements) == (
+        PlacementClassification.CANONICAL,
+        PlacementClassification.EXACT_DUPLICATE,
+    )
 
 
 def test_proposal_is_deterministic_for_the_same_entries_in_any_input_order() -> None:
@@ -100,4 +111,3 @@ def test_filesystem_modification_date_temporarily_resolves_media_creation_date()
     media = entry("photo.jpg", MediaCategory.IMAGE, modification_date)
 
     assert resolve_media_creation_date(media) == modification_date
-

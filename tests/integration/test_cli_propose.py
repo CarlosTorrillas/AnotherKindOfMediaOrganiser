@@ -39,7 +39,10 @@ def test_propose_command_prints_a_read_only_summary(tmp_path: Path, capsys) -> N
         "\n"
         "Media files: 2\n"
         "Proposed destinations: 2\n"
-        "Collisions: 0\n"
+        "Destination collisions: 0\n"
+        "Exact duplicate files: 0\n"
+        "Potential conflict files: 0\n"
+        "Unverified conflict files: 0\n"
         "\n"
         "Years:\n"
         "2023: 1\n"
@@ -67,7 +70,10 @@ def test_propose_command_displays_a_collision_and_all_competing_sources(
         "\n"
         "Media files: 3\n"
         "Proposed destinations: 3\n"
-        "Collisions: 1\n"
+        "Destination collisions: 1\n"
+        "Exact duplicate files: 2\n"
+        "Potential conflict files: 0\n"
+        "Unverified conflict files: 0\n"
         "\n"
         "Years:\n"
         "2024: 3\n"
@@ -75,9 +81,12 @@ def test_propose_command_displays_a_collision_and_all_competing_sources(
         "Collision examples:\n"
         "\n"
         "2024/01-January/IMAGE/IMG_001.jpg\n"
-        f"  - {third}\n"
-        f"  - {first}\n"
-        f"  - {second}\n"
+        "  canonical:\n"
+        f"    {third}\n"
+        "  exact duplicate:\n"
+        f"    {first}\n"
+        "  exact duplicate:\n"
+        f"    {second}\n"
         "\n"
         "Showing 1 of 1 collisions\n"
     )
@@ -111,5 +120,8 @@ def test_propose_command_shows_at_most_ten_deterministic_collision_examples(
     ]
     assert "IMG_010.jpg\n" not in first_output
     assert "IMG_011.jpg\n" not in first_output
-    assert "Collisions: 12\n" in first_output
+    assert "Destination collisions: 12\n" in first_output
+    assert "Exact duplicate files: 12\n" in first_output
+    assert "Potential conflict files: 0\n" in first_output
+    assert "Unverified conflict files: 0\n" in first_output
     assert "Showing 10 of 12 collisions\n" in first_output

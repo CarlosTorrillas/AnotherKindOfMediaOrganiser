@@ -55,7 +55,7 @@ The date that best represents when media was originally created or captured. Org
 
 ## Organisation Proposal
 
-A read-only plan showing how Recognised Media could be organised without changing the source Media Collection. It contains one Proposed Placement for every recognised Media Entry and reports proposed destinations that collide. Generating a proposal performs no organisation operation.
+A read-only plan showing how Recognised Media could be organised without changing the source Media Collection. It contains one Proposed Placement for every recognised Media Entry, classifies Destination Collisions, and may route additional files to flat review locations. Generating a proposal performs no organisation operation.
 
 ## Proposed Placement
 
@@ -63,7 +63,23 @@ The placement of one recognised Media Entry within an Organisation Proposal. It 
 
 ## Destination Collision
 
-A situation where two or more different Media Entries receive the same proposed destination in an Organisation Proposal. Collision counts represent distinct conflicting destination paths, not the number of Media Entries involved.
+A situation where two or more different Media Entries receive the same normal proposed destination in an Organisation Proposal. A Destination Collision does not prove that its files are duplicates. Collision counts represent distinct conflicting destination paths, not the number of Media Entries involved.
+
+## Canonical Placement
+
+The deterministic, neutral placement in a Destination Collision that retains the normal proposed destination. It is selected by stable source-path ordering and does not imply that its Media Entry is higher quality or more authoritative.
+
+## Exact Duplicate
+
+A non-canonical Media Entry whose file contents have been verified as byte-for-byte identical to the Canonical Placement. Exact Duplicate files receive deterministic proposed destinations under `exactDuplicates/`.
+
+## Potential Conflict
+
+A non-canonical Media Entry that competes for the same normal proposed destination but whose verified content differs from the Canonical Placement. Potential Conflict files remain available for human review under `potentialConflicts/`.
+
+## Unverified Conflict
+
+A Media Entry involved in a Destination Collision whose content could not be safely verified against the canonical placement. Unverified Conflict files remain represented under `unverifiedConflicts/` and are not counted as Exact Duplicates or Potential Conflicts.
 
 ## Ubiquitous language
 
