@@ -17,6 +17,7 @@ from another_kind_of_media_organiser.domain.organisation import OrganisationProp
 
 
 _NO_EXTENSION_LABEL = "[no extension]"
+_MAX_COLLISION_EXAMPLES = 10
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -66,6 +67,30 @@ def _print_proposal_summary(proposal: OrganisationProposal) -> None:
     )
     for year, count in sorted(year_counts.items()):
         print(f"{year}: {count}")
+    _print_collision_examples(proposal)
+
+
+def _print_collision_examples(proposal: OrganisationProposal) -> None:
+    total_collisions = len(proposal.collision_destinations)
+    if total_collisions == 0:
+        return
+
+    displayed_destinations = proposal.collision_destinations[
+        :_MAX_COLLISION_EXAMPLES
+    ]
+    print("\nCollision examples:")
+    for destination in displayed_destinations:
+        print(f"\n{destination}")
+        source_paths = sorted(
+            placement.source.path
+            for placement in proposal.placements
+            if placement.destination == destination
+        )
+        for source_path in source_paths:
+            print(f"  - {source_path}")
+    print(
+        f"\nShowing {len(displayed_destinations)} of {total_collisions} collisions"
+    )
 
 
 def main(arguments: Sequence[str] | None = None) -> int:
