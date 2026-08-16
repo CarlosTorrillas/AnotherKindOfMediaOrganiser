@@ -1,6 +1,7 @@
 """Command-line interface for AnotherKindOfMediaOrganiser."""
 
 import argparse
+import calendar
 import sqlite3
 import sys
 import time
@@ -22,6 +23,11 @@ from another_kind_of_media_organiser.application.execute_organisation_proposal i
     execute_organisation_plan,
     prepare_organisation_execution,
 )
+from another_kind_of_media_organiser.application.capacity_preflight import (
+    DEFAULT_SAFETY_RESERVE_BYTES,
+    CapacityPreflight,
+    plan_organisation_capacity,
+)
 from another_kind_of_media_organiser.application.generate_organisation_proposal import (
     CollisionClassificationProgress,
     generate_content_verified_organisation_proposal,
@@ -38,6 +44,9 @@ from another_kind_of_media_organiser.domain.organisation import (
 from another_kind_of_media_organiser.infrastructure.digest_cache import (
     SqliteDigestCache,
     default_digest_cache_path,
+)
+from another_kind_of_media_organiser.infrastructure.filesystem_capacity import (
+    available_capacity,
 )
 
 
@@ -419,16 +428,39 @@ def main(arguments: Sequence[str] | None = None) -> int:
         else:
             try:
                 proposal = generate_organisation_proposal(result)
-                plan = prepare_organisation_execution(
+                full_plan = prepare_organisation_execution(
                     proposal,
                     parsed_arguments.directory,
                     parsed_arguments.destination,
+                )
+                capacity = plan_organisation_capacity(
+                    proposal,
+                    available_capacity(parsed_arguments.destination),
+                )
+                if capacity.execution_proposal is None:
+                    _print_capacity_preflight(capacity)
+                    print(
+                        "No complete Year/Month group fits usable capacity.",
+                        file=sys.stderr,
+                    )
+                    print("No media files have been copied.", file=sys.stderr)
+                    return 2
+                plan = (
+                    prepare_organisation_execution(
+                        capacity.execution_proposal,
+                        parsed_arguments.directory,
+                        parsed_arguments.destination,
+                    )
+                    if capacity.is_partial
+                    else full_plan
                 )
             except (UnsafeDestinationError, DestinationConflictError, OSError) as error:
                 print(f"Organisation preflight failed: {error}", file=sys.stderr)
                 print("No media files have been copied.", file=sys.stderr)
                 return 2
-            return _confirm_and_execute(plan, move=parsed_arguments.move)
+            return _confirm_and_execute(
+                plan, move=parsed_arguments.move, capacity=capacity
+            )
     else:
         print("AnotherKindOfMediaOrganiser")
     return 0
@@ -451,7 +483,14 @@ def _verify_collisions(result: ScanResult) -> OrganisationProposal:
             digest_cache.close()
 
 
-def _confirm_and_execute(plan: OrganisationExecutionPlan, *, move: bool = False) -> int:
+def _confirm_and_execute(
+    plan: OrganisationExecutionPlan,
+    *,
+    move: bool = False,
+    capacity: CapacityPreflight | None = None,
+) -> int:
+    if capacity is not None:
+        _print_capacity_preflight(capacity)
     print("Organisation execution")
     print(f"\nSource:\n  {plan.source_root}")
     print(f"\nDestination:\n  {plan.destination_root}")
@@ -465,7 +504,11 @@ def _confirm_and_execute(plan: OrganisationExecutionPlan, *, move: bool = False)
     else:
         print("\nSource files will NOT be modified or deleted.")
     try:
-        answer = input("\nContinue? [y/N] ")
+        if capacity is not None and capacity.is_partial:
+            print("\nContinue with this partial organisation? [y/N] ", end="")
+            answer = input("")
+        else:
+            answer = input("\nContinue? [y/N] ")
     except EOFError:
         answer = ""
     except KeyboardInterrupt:
@@ -527,7 +570,13 @@ def _confirm_and_execute(plan: OrganisationExecutionPlan, *, move: bool = False)
         )
         return 1
 
-    print("\nOrganisation completed.")
+    print(
+        "\nPartial organisation completed."
+        if capacity is not None and capacity.is_partial
+        else "\nOrganisation completed."
+    )
+    if capacity is not None and capacity.is_partial:
+        print(f"\nOrganised:\n  {_format_month_range(capacity.included_months)}")
     print(f"Files copied: {result.files_copied} / {result.total_files}")
     print(f"Data copied: {_format_bytes(result.bytes_copied)}")
     if move:
@@ -535,7 +584,55 @@ def _confirm_and_execute(plan: OrganisationExecutionPlan, *, move: bool = False)
         print(f"Source files deleted: {result.source_files_deleted}")
     else:
         print("Source files have not been modified.")
+    if capacity is not None and capacity.is_partial:
+        print("Remaining media was not modified.")
     return 0
+
+
+def _print_capacity_preflight(capacity: CapacityPreflight) -> None:
+    print("Organisation preflight")
+    print(f"\nMedia files: {len(capacity.requested_proposal.placements)}")
+    print(f"Required space: {_format_bytes(capacity.required_bytes)}")
+    print(f"Available space: {_format_bytes(capacity.available_bytes)}")
+    print(f"Safety reserve: {_format_bytes(capacity.reserve_bytes)}")
+    print(f"Usable capacity: {_format_bytes(capacity.usable_bytes)}")
+    if not capacity.excluded_groups:
+        print(
+            f"Estimated remaining: "
+            f"{_format_bytes(capacity.usable_bytes - capacity.required_bytes)}"
+        )
+        print("\nSpace check: OK\n")
+        return
+
+    print("\nThe complete organisation does not fit.")
+    if capacity.execution_proposal is None:
+        print("\nA partial organisation is not possible.")
+    else:
+        print("\nA partial organisation is possible:")
+        print(f"  {_format_month_range(capacity.included_months)}")
+        print(
+            f"  Media files: {len(capacity.execution_proposal.placements)}"
+        )
+        print(f"  Required: {_format_bytes(capacity.execution_required_bytes)}")
+        print(
+            f"  Estimated remaining: "
+            f"{_format_bytes(capacity.usable_bytes - capacity.execution_required_bytes)}"
+        )
+    print("\nNot included:")
+    for group in capacity.excluded_groups:
+        print(
+            f"  {group.year}/{group.month:02d} "
+            f"({_format_bytes(group.required_bytes)})"
+        )
+    print()
+
+
+def _format_month_range(months: tuple[tuple[int, int], ...]) -> str:
+    first_year, first_month = months[0]
+    last_year, last_month = months[-1]
+    first = f"{first_year} {calendar.month_name[first_month]}"
+    last = f"{last_year} {calendar.month_name[last_month]}"
+    return first if first == last else f"{first} → {last}"
 
 
 def _print_organisation_cancellation(

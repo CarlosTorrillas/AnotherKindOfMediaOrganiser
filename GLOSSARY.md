@@ -69,6 +69,14 @@ A read-only plan showing how Recognised Media could be organised without changin
 
 The explicit application of an accepted Organisation Proposal to a Destination Collection. It never silently overwrites an existing destination file. COPY and MOVE Organisation Execution use the same proposal and complete safety preflight.
 
+## Capacity Preflight
+
+A read-only check performed before Organisation Execution that compares the requested Organisation Proposal with usable destination capacity. Usable capacity is reported free space minus the explicit safety reserve. Capacity Preflight may select the full proposal, offer a Partial Organisation Proposal, or determine that no complete Year/Month group can be executed.
+
+## Partial Organisation Proposal
+
+A subset of an Organisation Proposal containing a continuous oldest-first prefix of complete chronological Year/Month groups selected because of destination capacity constraints. Selection stops at the first Year/Month group that does not fit and never skips ahead to include a later month, even if that later month would fit. Every included Proposed Placement retains exactly its original destination; excluded Media Entries remain untouched.
+
 ## COPY Organisation Execution
 
 Organisation Execution that creates each Proposed Placement in the Destination Collection while leaving every source Media Entry unchanged. COPY is always the default mode.
