@@ -69,6 +69,10 @@ A situation where two or more different Media Entries receive the same normal pr
 
 A non-canonical Media Entry that competes with another Media Entry for the same normal proposed destination. It receives a deterministic review destination under `nameConflicts/`. A Name Conflict records only competition for a proposed path; it does not imply that file contents are identical, different, or unreadable.
 
+## Collision Verification
+
+An explicit, potentially expensive, read-only analysis of Media Entries involved in Destination Collisions. Collision Verification compares file sizes and, when necessary, SHA-256 content digests to classify non-canonical entries as Exact Duplicates, Potential Conflicts, or Unverified Conflicts. It is separate from the standard lightweight Organisation Proposal and does not create the proposed review directories.
+
 ## Canonical Placement
 
 The deterministic, neutral placement in a Destination Collision that retains the normal proposed destination. It is selected by stable source-path ordering and does not imply that its Media Entry is higher quality or more authoritative.
