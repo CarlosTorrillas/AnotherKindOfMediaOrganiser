@@ -18,9 +18,13 @@ A read-only inspection of a Media Collection. A Scan gathers information about t
 
 A Scan that encountered one or more inaccessible filesystem paths. Its Scan Result contains only information that could be inspected safely and records the inaccessible paths and reported reasons. An incomplete Scan may inform a partial Organisation Proposal or Collision Verification, but it must never be used for Organisation Execution.
 
+## Excluded Path
+
+A path intentionally declared outside the effective Media Collection before scanning. The scanner does not inspect an excluded file or descend into an excluded directory, records encountered exclusions separately, and does not make the Scan incomplete because of them. Exclusion never authorises ignoring an unexpected access failure, and excluded media cannot participate in COPY or MOVE Organisation Execution.
+
 ## Scan Result
 
-The information produced by a Scan. It currently summarises the total files encountered, recognised media, unsupported files, directories scanned, media counts by category, discovered File Extensions, discovered Media Entries, whether the Scan is complete, and any inaccessible paths.
+The information produced by a Scan. It currently summarises the total files encountered, recognised media, unsupported files, directories scanned, media counts by category, discovered File Extensions, discovered Media Entries, whether the Scan is complete, and any excluded or inaccessible paths.
 
 ## Media Entry
 

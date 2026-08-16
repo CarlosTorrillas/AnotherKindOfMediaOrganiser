@@ -218,20 +218,24 @@ def _build_parser() -> argparse.ArgumentParser:
     subcommands = parser.add_subparsers(dest="command")
     scan_parser = subcommands.add_parser("scan", help="scan a media collection")
     scan_parser.add_argument("directory", type=Path)
+    _add_exclusions(scan_parser)
     propose_parser = subcommands.add_parser(
         "propose", help="quickly propose how to organise a media collection"
     )
     propose_parser.add_argument("directory", type=Path)
+    _add_exclusions(propose_parser)
     verify_parser = subcommands.add_parser(
         "verify-collisions",
         help="deeply verify the content of destination collisions",
     )
     verify_parser.add_argument("directory", type=Path)
+    _add_exclusions(verify_parser)
     organise_parser = subcommands.add_parser(
         "organise",
         help="copy an accepted lightweight proposal to a separate destination",
     )
     organise_parser.add_argument("directory", type=Path, metavar="SOURCE")
+    _add_exclusions(organise_parser)
     organise_parser.add_argument(
         "--destination", required=True, type=Path, metavar="DESTINATION"
     )
@@ -241,6 +245,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="copy, verify, then delete each source file (default: copy)",
     )
     return parser
+
+
+def _add_exclusions(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        type=Path,
+        metavar="PATH",
+        help="exclude a path relative to the scan root (repeatable)",
+    )
 
 
 def _print_summary(result: ScanResult) -> None:
@@ -253,8 +268,11 @@ def _print_summary(result: ScanResult) -> None:
     print(f"Unsupported: {result.unsupported_files}")
     print(f"Directories scanned: {result.directories_scanned}")
     print(f"Scan complete: {'YES' if result.is_complete else 'NO'}")
+    _print_excluded_paths(result)
     if not result.is_complete:
         _print_inaccessible_paths(result)
+    else:
+        print("Inaccessible paths: 0")
     _print_extension_breakdown("Recognised media", result.recognised_extension_counts)
     _print_extension_breakdown("Unsupported", result.unsupported_extension_counts)
 
@@ -277,6 +295,18 @@ def _print_inaccessible_paths(
         f"Showing {len(examples)} of {len(inaccessible)} inaccessible paths",
         file=output,
     )
+
+
+def _print_excluded_paths(result: ScanResult) -> None:
+    excluded = sorted(result.excluded_paths, key=lambda path: path.as_posix())
+    print(f"Excluded paths: {len(excluded)}")
+    if not excluded:
+        return
+    examples = excluded[:_MAX_INACCESSIBLE_EXAMPLES]
+    print("Excluded path examples:")
+    for path in examples:
+        print(f"  {path}")
+    print(f"Showing {len(examples)} of {len(excluded)} excluded paths")
 
 
 def _warn_incomplete_scan(result: ScanResult, message: str) -> None:
@@ -370,12 +400,21 @@ def main(arguments: Sequence[str] | None = None) -> int:
         "organise",
     }:
         try:
-            result = scan_media_collection(parsed_arguments.directory)
+            if parsed_arguments.exclude:
+                result = scan_media_collection(
+                    parsed_arguments.directory,
+                    excluded_paths=tuple(parsed_arguments.exclude),
+                )
+            else:
+                result = scan_media_collection(parsed_arguments.directory)
         except NotADirectoryError:
             print(
                 f"Error: '{parsed_arguments.directory}' is not a valid directory.",
                 file=sys.stderr,
             )
+            return 2
+        except ValueError as error:
+            print(f"Error: {error}", file=sys.stderr)
             return 2
         except KeyboardInterrupt:
             if parsed_arguments.command == "scan":
@@ -407,6 +446,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
                 _warn_incomplete_scan(
                     result, "Verification covers accessible media only."
                 )
+        if parsed_arguments.command != "scan" and result.excluded_paths:
+            _print_excluded_paths(result)
         if parsed_arguments.command == "scan":
             _print_summary(result)
         elif parsed_arguments.command == "propose":

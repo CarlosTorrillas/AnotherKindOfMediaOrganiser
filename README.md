@@ -29,6 +29,23 @@ pytest
 behave
 ```
 
+Every scanning command accepts repeatable exclusions relative to its scan root:
+
+```bash
+media-organiser scan /path/to/media --exclude old-backup
+media-organiser propose /path/to/media --exclude "Lightroom Catalog"
+media-organiser verify-collisions /path/to/media --exclude old-backup
+media-organiser organise /path/to/media --destination /organised --move \
+  --exclude old-backup --exclude "Lightroom Catalog"
+```
+
+At the scan-root level, the known macOS metadata directories
+`.DocumentRevisions-V100`, `.Spotlight-V100`, `.TemporaryItems`, `.Trashes`, and
+`.fseventsd` are excluded by default. Other hidden directories are scanned
+normally. Encountered exclusions are reported separately from inaccessible
+paths; an unexpected access failure still makes the scan incomplete and blocks
+organisation.
+
 The `propose` command is lightweight and read-only: it calculates destinations
 and reports naming conflicts without reading or hashing media content. Explicit
 content-verification capabilities and their persistent SHA-256 cache are kept
