@@ -40,6 +40,7 @@ from another_kind_of_media_organiser.infrastructure.digest_cache import (
 
 _NO_EXTENSION_LABEL = "[no extension]"
 _MAX_COLLISION_EXAMPLES = 10
+_MAX_INACCESSIBLE_EXAMPLES = 10
 _INTERACTIVE_UPDATE_INTERVAL_SECONDS = 0.2
 _NON_INTERACTIVE_BYTE_MILESTONE = 1024 * 1024 * 1024
 
@@ -221,8 +222,37 @@ def _print_summary(result: ScanResult) -> None:
     print(f"Audio: {result.counts_by_category[MediaCategory.AUDIO]}")
     print(f"Unsupported: {result.unsupported_files}")
     print(f"Directories scanned: {result.directories_scanned}")
+    print(f"Scan complete: {'YES' if result.is_complete else 'NO'}")
+    if not result.is_complete:
+        _print_inaccessible_paths(result)
     _print_extension_breakdown("Recognised media", result.recognised_extension_counts)
     _print_extension_breakdown("Unsupported", result.unsupported_extension_counts)
+
+
+def _print_inaccessible_paths(
+    result: ScanResult,
+    *,
+    output: TextIO | None = None,
+) -> None:
+    output = output or sys.stdout
+    inaccessible = sorted(
+        result.inaccessible_paths, key=lambda item: item.path.as_posix()
+    )
+    examples = inaccessible[:_MAX_INACCESSIBLE_EXAMPLES]
+    print(f"Inaccessible paths: {len(inaccessible)}", file=output)
+    print("Inaccessible path examples:", file=output)
+    for item in examples:
+        print(f"  {item.path} ({item.reason})", file=output)
+    print(
+        f"Showing {len(examples)} of {len(inaccessible)} inaccessible paths",
+        file=output,
+    )
+
+
+def _warn_incomplete_scan(result: ScanResult, message: str) -> None:
+    print("WARNING: Scan is incomplete.", file=sys.stderr)
+    _print_inaccessible_paths(result, output=sys.stderr)
+    print(message, file=sys.stderr)
 
 
 def _print_extension_breakdown(title: str, counts: Mapping[str, int]) -> None:
@@ -325,6 +355,26 @@ def main(arguments: Sequence[str] | None = None) -> int:
                 return 130
             _print_cancellation(parsed_arguments.command)
             return 130
+        if not result.is_complete:
+            if parsed_arguments.command == "organise":
+                print(
+                    "Organisation refused: source scan is incomplete.",
+                    file=sys.stderr,
+                )
+                _print_inaccessible_paths(result, output=sys.stderr)
+                print(
+                    "No destination files or directories have been created.",
+                    file=sys.stderr,
+                )
+                return 2
+            if parsed_arguments.command == "propose":
+                _warn_incomplete_scan(
+                    result, "Proposal includes accessible media only."
+                )
+            elif parsed_arguments.command == "verify-collisions":
+                _warn_incomplete_scan(
+                    result, "Verification covers accessible media only."
+                )
         if parsed_arguments.command == "scan":
             _print_summary(result)
         elif parsed_arguments.command == "propose":

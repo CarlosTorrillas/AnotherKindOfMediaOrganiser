@@ -56,6 +56,14 @@ class MediaEntry:
 
 
 @dataclass(frozen=True)
+class InaccessiblePath:
+    """A filesystem path that could not be inspected during a Scan."""
+
+    path: Path
+    reason: str
+
+
+@dataclass(frozen=True)
 class ScanResult:
     """A read-only summary of a scanned media collection."""
 
@@ -66,8 +74,14 @@ class ScanResult:
     recognised_extension_counts: Mapping[str, int]
     unsupported_extension_counts: Mapping[str, int]
     media_entries: tuple[MediaEntry, ...]
+    inaccessible_paths: tuple[InaccessiblePath, ...] = ()
 
     @property
     def media_files(self) -> int:
         """Return the number of recognised media files."""
         return len(self.media_entries)
+
+    @property
+    def is_complete(self) -> bool:
+        """Return whether every encountered path could be inspected."""
+        return not self.inaccessible_paths

@@ -62,7 +62,9 @@ def test_organise_refuses_incomplete_scan_before_any_write(
     monkeypatch.setattr(cli, "scan_media_collection", lambda _path: result)
 
     def unexpected_action(*_args, **_kwargs):
-        raise AssertionError("incomplete scan must stop before planning or confirmation")
+        raise AssertionError(
+            "incomplete scan must stop before planning or confirmation"
+        )
 
     monkeypatch.setattr(cli, "generate_organisation_proposal", unexpected_action)
     monkeypatch.setattr("builtins.input", unexpected_action)

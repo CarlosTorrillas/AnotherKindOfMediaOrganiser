@@ -1,6 +1,7 @@
 """Read-only filesystem traversal for media collection scans."""
 
 import os
+import stat
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,6 +9,7 @@ from pathlib import Path
 from another_kind_of_media_organiser.domain.media import (
     MediaCategory,
     MediaEntry,
+    InaccessiblePath,
     ScanResult,
     classify_media,
     normalise_file_extension,
@@ -26,8 +28,21 @@ def scan_directory(root: Path) -> ScanResult:
     total_files = 0
     unsupported_files = 0
     directories_scanned = 0
+    inaccessible_paths: dict[Path, InaccessiblePath] = {}
 
-    for directory, child_directories, filenames in os.walk(root, followlinks=False):
+    def record_inaccessible(error: OSError, path: Path | None = None) -> None:
+        inaccessible_path = path or Path(error.filename or root)
+        reason = error.strerror or type(error).__name__
+        inaccessible_paths[inaccessible_path] = InaccessiblePath(
+            inaccessible_path,
+            reason,
+        )
+
+    for directory, child_directories, filenames in os.walk(
+        root,
+        followlinks=False,
+        onerror=record_inaccessible,
+    ):
         directory_path = Path(directory)
         child_directories[:] = [
             name for name in child_directories if not (directory_path / name).is_symlink()
@@ -36,7 +51,12 @@ def scan_directory(root: Path) -> ScanResult:
 
         for filename in filenames:
             path = directory_path / filename
-            if path.is_symlink():
+            try:
+                metadata = path.lstat()
+            except OSError as error:
+                record_inaccessible(error, path)
+                continue
+            if stat.S_ISLNK(metadata.st_mode):
                 continue
 
             total_files += 1
@@ -50,7 +70,7 @@ def scan_directory(root: Path) -> ScanResult:
             category_counts[category] += 1
             recognised_extension_counts[extension] += 1
             modification_date = datetime.fromtimestamp(
-                path.stat().st_mtime,
+                metadata.st_mtime,
                 tz=timezone.utc,
             )
             entries.append(MediaEntry(path, category, modification_date))
@@ -68,4 +88,7 @@ def scan_directory(root: Path) -> ScanResult:
         recognised_extension_counts=dict(recognised_extension_counts),
         unsupported_extension_counts=dict(unsupported_extension_counts),
         media_entries=tuple(entries),
+        inaccessible_paths=tuple(
+            sorted(inaccessible_paths.values(), key=lambda item: item.path.as_posix())
+        ),
     )
