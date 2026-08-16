@@ -12,6 +12,7 @@ from typing import TextIO
 
 from another_kind_of_media_organiser.application.generate_organisation_proposal import (
     CollisionClassificationProgress,
+    generate_content_verified_organisation_proposal,
     generate_organisation_proposal,
 )
 from another_kind_of_media_organiser.application.scan_media_collection import (
@@ -91,7 +92,7 @@ class _CollisionProgressReporter:
             print(file=self.output)
 
     def _write_interactive(self, progress: CollisionClassificationProgress) -> None:
-        line = self._format(progress, "Classifying destination collisions")
+        line = self._format(progress, "Verifying destination collisions")
         self.max_line_length = max(self.max_line_length, len(line))
         completed = progress.processed_candidates == progress.total_candidates
         ending = "\n" if completed else ""
@@ -105,7 +106,7 @@ class _CollisionProgressReporter:
 
     def _write_line(self, progress: CollisionClassificationProgress) -> None:
         print(
-            self._format(progress, "Collision classification"),
+            self._format(progress, "Collision verification"),
             file=self.output,
             flush=True,
         )
@@ -140,9 +141,14 @@ def _build_parser() -> argparse.ArgumentParser:
     scan_parser = subcommands.add_parser("scan", help="scan a media collection")
     scan_parser.add_argument("directory", type=Path)
     propose_parser = subcommands.add_parser(
-        "propose", help="propose how to organise a media collection"
+        "propose", help="quickly propose how to organise a media collection"
     )
     propose_parser.add_argument("directory", type=Path)
+    verify_parser = subcommands.add_parser(
+        "verify-collisions",
+        help="deeply verify the content of destination collisions",
+    )
+    verify_parser.add_argument("directory", type=Path)
     return parser
 
 
@@ -185,6 +191,21 @@ def _print_proposal_summary(proposal: OrganisationProposal) -> None:
     _print_collision_examples(proposal)
 
 
+def _print_verification_summary(proposal: OrganisationProposal) -> None:
+    print("Collision verification")
+    if not proposal.collision_destinations:
+        print("No destination collisions require verification.")
+        print("No files have been changed.")
+        return
+
+    print(f"\nDestination collisions: {len(proposal.collision_destinations)}")
+    print(f"Exact duplicate files: {proposal.exact_duplicate_files}")
+    print(f"Potential conflict files: {proposal.potential_conflict_files}")
+    print(f"Unverified conflict files: {proposal.unverified_conflict_files}")
+    print("\nNo files have been changed.")
+    _print_collision_examples(proposal)
+
+
 def _print_collision_examples(proposal: OrganisationProposal) -> None:
     total_collisions = len(proposal.collision_destinations)
     if total_collisions == 0:
@@ -222,7 +243,7 @@ def _print_collision_examples(proposal: OrganisationProposal) -> None:
 def main(arguments: Sequence[str] | None = None) -> int:
     """Run the command-line interface."""
     parsed_arguments = _build_parser().parse_args(arguments)
-    if parsed_arguments.command in {"scan", "propose"}:
+    if parsed_arguments.command in {"scan", "propose", "verify-collisions"}:
         try:
             result = scan_media_collection(parsed_arguments.directory)
         except NotADirectoryError:
@@ -232,26 +253,57 @@ def main(arguments: Sequence[str] | None = None) -> int:
             )
             return 2
         except KeyboardInterrupt:
-            if parsed_arguments.command != "propose":
+            if parsed_arguments.command == "scan":
                 raise
-            _print_proposal_cancellation()
+            _print_cancellation(parsed_arguments.command)
             return 130
         if parsed_arguments.command == "scan":
             _print_summary(result)
-        else:
+        elif parsed_arguments.command == "propose":
             try:
                 proposal = generate_organisation_proposal(result)
             except KeyboardInterrupt:
-                _print_proposal_cancellation()
+                _print_cancellation(parsed_arguments.command)
                 return 130
             _print_proposal_summary(proposal)
+        else:
+            print("Verifying destination collisions...")
+            print("This may take a long time for large collections.\n")
+            try:
+                proposal = _verify_collisions(result)
+            except KeyboardInterrupt:
+                _print_cancellation(parsed_arguments.command)
+                return 130
+            _print_verification_summary(proposal)
     else:
         print("AnotherKindOfMediaOrganiser")
     return 0
 
 
-def _print_proposal_cancellation() -> None:
-    print("Proposal generation cancelled.", file=sys.stderr)
+def _verify_collisions(result: ScanResult) -> OrganisationProposal:
+    progress_reporter = _CollisionProgressReporter(sys.stderr)
+    digest_cache = _open_digest_cache()
+    try:
+        return generate_content_verified_organisation_proposal(
+            result,
+            progress_reporter,
+            digest_cache=digest_cache,
+        )
+    except KeyboardInterrupt:
+        progress_reporter.cancel()
+        raise
+    finally:
+        if digest_cache is not None:
+            digest_cache.close()
+
+
+def _print_cancellation(command: str) -> None:
+    message = (
+        "Proposal generation cancelled."
+        if command == "propose"
+        else "Collision verification cancelled."
+    )
+    print(message, file=sys.stderr)
     print("No files have been changed.", file=sys.stderr)
 
 

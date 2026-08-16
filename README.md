@@ -22,6 +22,7 @@ Run the application and test suites:
 media-organiser
 media-organiser scan /path/to/media
 media-organiser propose /path/to/media
+media-organiser verify-collisions /path/to/media
 pytest
 behave
 ```
@@ -30,6 +31,13 @@ The `propose` command is lightweight and read-only: it calculates destinations
 and reports naming conflicts without reading or hashing media content. Explicit
 content-verification capabilities and their persistent SHA-256 cache are kept
 separate from this default proposal workflow.
+
+The explicitly expensive `verify-collisions` command inspects only Destination
+Collisions. It classifies competing files as Exact Duplicates, Potential
+Conflicts, or Unverified Conflicts using size-first, chunked SHA-256 comparison.
+Completed hashes are cached outside the Media Collection and reused between
+runs. Both commands produce read-only plans and never create their proposed
+review directories.
 
 The initial supported extensions are `.jpg`, `.jpeg`, `.png`, `.heic`, `.arw`, `.cr2`, `.nef`, `.mp4`, `.mov`, and `.m4v`, matched case-insensitively. Other files are reported as unsupported rather than silently ignored.
 
