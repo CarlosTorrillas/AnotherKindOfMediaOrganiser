@@ -175,9 +175,7 @@ def _print_proposal_summary(proposal: OrganisationProposal) -> None:
     print(f"\nMedia files: {len(proposal.placements)}")
     print(f"Proposed destinations: {len(proposal.placements)}")
     print(f"Destination collisions: {len(proposal.collision_destinations)}")
-    print(f"Exact duplicate files: {proposal.exact_duplicate_files}")
-    print(f"Potential conflict files: {proposal.potential_conflict_files}")
-    print(f"Unverified conflict files: {proposal.unverified_conflict_files}")
+    print(f"Name conflict files: {proposal.name_conflict_files}")
     print("\nYears:")
     year_counts = Counter(
         placement.media_creation_date.year for placement in proposal.placements
@@ -209,6 +207,7 @@ def _print_collision_examples(proposal: OrganisationProposal) -> None:
         for placement in collision_placements:
             label = {
                 PlacementClassification.CANONICAL: "canonical",
+                PlacementClassification.NAME_CONFLICT: "name conflict",
                 PlacementClassification.EXACT_DUPLICATE: "exact duplicate",
                 PlacementClassification.POTENTIAL_CONFLICT: "potential conflict",
                 PlacementClassification.UNVERIFIED_CONFLICT: "unverified conflict",
@@ -240,21 +239,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
         if parsed_arguments.command == "scan":
             _print_summary(result)
         else:
-            progress_reporter = _CollisionProgressReporter(sys.stderr)
-            digest_cache = _open_digest_cache()
             try:
-                proposal = generate_organisation_proposal(
-                    result,
-                    progress_reporter,
-                    digest_cache=digest_cache,
-                )
+                proposal = generate_organisation_proposal(result)
             except KeyboardInterrupt:
-                progress_reporter.cancel()
                 _print_proposal_cancellation()
                 return 130
-            finally:
-                if digest_cache is not None:
-                    digest_cache.close()
             _print_proposal_summary(proposal)
     else:
         print("AnotherKindOfMediaOrganiser")

@@ -13,6 +13,7 @@ class PlacementClassification(Enum):
 
     NORMAL = "NORMAL"
     CANONICAL = "CANONICAL"
+    NAME_CONFLICT = "NAME_CONFLICT"
     EXACT_DUPLICATE = "EXACT_DUPLICATE"
     POTENTIAL_CONFLICT = "POTENTIAL_CONFLICT"
     UNVERIFIED_CONFLICT = "UNVERIFIED_CONFLICT"
@@ -37,6 +38,10 @@ class OrganisationProposal:
 
     placements: tuple[ProposedPlacement, ...]
     collision_destinations: tuple[Path, ...]
+
+    @property
+    def name_conflict_files(self) -> int:
+        return self._count(PlacementClassification.NAME_CONFLICT)
 
     @property
     def exact_duplicate_files(self) -> int:
