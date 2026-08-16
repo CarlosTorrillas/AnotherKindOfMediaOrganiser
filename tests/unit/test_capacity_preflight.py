@@ -34,7 +34,9 @@ def test_full_proposal_fits_and_reuses_every_placement(tmp_path: Path) -> None:
         [("jan.jpg", b"123", date(2023, 1)), ("feb.jpg", b"4567", date(2023, 2))],
     )
 
-    result = plan_organisation_capacity(proposal, available_bytes=17, reserve_bytes=10)
+    result = plan_organisation_capacity(
+        proposal, available_bytes=17, allocation_unit=1, reserve_bytes=10
+    )
 
     assert result.required_bytes == 7
     assert result.usable_bytes == 7
@@ -53,7 +55,9 @@ def test_partial_proposal_is_oldest_complete_month_prefix(tmp_path: Path) -> Non
         ],
     )
 
-    result = plan_organisation_capacity(proposal, available_bytes=7, reserve_bytes=0)
+    result = plan_organisation_capacity(
+        proposal, available_bytes=7, allocation_unit=1, reserve_bytes=0
+    )
 
     assert result.is_partial
     assert result.included_months == ((2023, 12), (2024, 1))
@@ -88,10 +92,10 @@ def test_next_month_is_wholly_excluded_and_name_conflicts_stay_together(
     )
 
     without_february = plan_organisation_capacity(
-        proposal, available_bytes=5, reserve_bytes=0
+        proposal, available_bytes=5, allocation_unit=1, reserve_bytes=0
     )
     with_february = plan_organisation_capacity(
-        proposal, available_bytes=6, reserve_bytes=0
+        proposal, available_bytes=6, allocation_unit=1, reserve_bytes=0
     )
 
     assert without_february.included_months == ((2024, 1),)
@@ -108,7 +112,9 @@ def test_no_executable_proposal_when_oldest_month_exceeds_usable_capacity(
 ) -> None:
     proposal = proposal_for(tmp_path, [("large.jpg", b"12345", date(2024, 1))])
 
-    result = plan_organisation_capacity(proposal, available_bytes=4, reserve_bytes=0)
+    result = plan_organisation_capacity(
+        proposal, available_bytes=4, allocation_unit=1, reserve_bytes=0
+    )
 
     assert result.execution_proposal is None
     assert result.included_months == ()
@@ -121,7 +127,53 @@ def test_unsupported_files_do_not_consume_capacity(tmp_path: Path) -> None:
         [("photo.jpg", b"12", date(2024, 1)), ("huge.txt", b"x" * 100, date(2024, 1))],
     )
 
-    result = plan_organisation_capacity(proposal, available_bytes=2, reserve_bytes=0)
+    result = plan_organisation_capacity(
+        proposal, available_bytes=2, allocation_unit=1, reserve_bytes=0
+    )
 
     assert result.required_bytes == 2
     assert result.execution_proposal == proposal
+
+
+def test_capacity_rounds_each_file_to_destination_allocation_unit(
+    tmp_path: Path,
+) -> None:
+    proposal = proposal_for(
+        tmp_path,
+        [
+            ("small-a.jpg", b"a", date(2024, 1)),
+            ("small-b.jpg", b"bc", date(2024, 1)),
+            ("exact.jpg", b"1234", date(2024, 1)),
+        ],
+    )
+
+    result = plan_organisation_capacity(
+        proposal,
+        available_bytes=100,
+        allocation_unit=4,
+        reserve_bytes=10,
+    )
+
+    assert result.logical_required_bytes == 7
+    assert result.required_bytes == 12
+    assert result.required_bytes >= result.logical_required_bytes
+    assert result.allocation_unit == 4
+    assert result.reserve_bytes == 10
+
+
+def test_many_small_files_are_rounded_individually(tmp_path: Path) -> None:
+    proposal = proposal_for(
+        tmp_path,
+        [(f"{index}.jpg", b"x", date(2024, 1)) for index in range(100)],
+    )
+
+    result = plan_organisation_capacity(
+        proposal,
+        available_bytes=20_000,
+        allocation_unit=128,
+        reserve_bytes=1_024,
+    )
+
+    assert result.logical_required_bytes == 100
+    assert result.required_bytes == 12_800
+    assert result.usable_bytes == 18_976

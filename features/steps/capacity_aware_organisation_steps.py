@@ -78,7 +78,7 @@ def given_partial_offered(context) -> None:
 @when("that month is selected by Capacity Preflight")
 def perform_preflight(context) -> None:
     context.capacity = plan_organisation_capacity(
-        context.proposal, context.available, reserve_bytes=0
+        context.proposal, context.available, allocation_unit=1, reserve_bytes=0
     )
 
 

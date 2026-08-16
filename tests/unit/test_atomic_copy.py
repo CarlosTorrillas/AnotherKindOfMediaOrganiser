@@ -1,4 +1,5 @@
 import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -7,13 +8,21 @@ from another_kind_of_media_organiser.infrastructure import atomic_copy
 
 
 def test_copies_through_a_temporary_file_and_preserves_mtime(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch
 ) -> None:
     source = tmp_path / "source.jpg"
     source.write_bytes(b"valuable media")
     os.utime(source, ns=(1_700_000_000_000_000_000, 1_700_000_000_000_000_000))
     destination = tmp_path / "nested" / "destination.jpg"
     copied_chunks: list[int] = []
+
+    monkeypatch.setattr(
+        shutil,
+        "copystat",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("atomic copy must not broadly copy metadata")
+        ),
+    )
 
     atomic_copy.copy_file(source, destination, copied_chunks.append)
 
