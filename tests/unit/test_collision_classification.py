@@ -4,7 +4,7 @@ from pathlib import Path
 
 from another_kind_of_media_organiser.application import generate_organisation_proposal as proposal_module
 from another_kind_of_media_organiser.application.generate_organisation_proposal import (
-    generate_organisation_proposal,
+    generate_content_verified_organisation_proposal,
 )
 from another_kind_of_media_organiser.application.scan_media_collection import (
     scan_media_collection,
@@ -44,7 +44,7 @@ def test_different_sizes_become_conflicts_without_hashing(
 
     monkeypatch.setattr(proposal_module.file_content, "sha256_digest", unexpected_hash)
 
-    proposal = generate_organisation_proposal(scan_result)
+    proposal = generate_content_verified_organisation_proposal(scan_result)
 
     assert proposal.exact_duplicate_files == 0
     assert proposal.potential_conflict_files == 1
@@ -57,7 +57,7 @@ def test_identical_content_creates_numbered_duplicate_destinations(
         tmp_path, (b"identical", b"identical", b"identical"), suffix=".JPG"
     )
 
-    proposal = generate_organisation_proposal(scan_result)
+    proposal = generate_content_verified_organisation_proposal(scan_result)
 
     assert placements_of(proposal, PlacementClassification.CANONICAL)[0].source.path == paths[0]
     duplicates = placements_of(proposal, PlacementClassification.EXACT_DUPLICATE)
@@ -74,7 +74,7 @@ def test_mixed_content_groups_keep_every_source_once(tmp_path: Path) -> None:
         (b"canonical", b"canonical", b"canonical", b"different", b"different"),
     )
 
-    proposal = generate_organisation_proposal(scan_result)
+    proposal = generate_content_verified_organisation_proposal(scan_result)
 
     assert proposal.exact_duplicate_files == 2
     assert proposal.potential_conflict_files == 2
@@ -104,7 +104,7 @@ def test_hashes_only_same_sized_collision_candidates_once(
 
     monkeypatch.setattr(proposal_module.file_content, "sha256_digest", recording_digest)
 
-    generate_organisation_proposal(scan_result)
+    generate_content_verified_organisation_proposal(scan_result)
 
     assert sorted(hash_calls) == sorted(paths[:3])
     assert len(hash_calls) == len(set(hash_calls))
@@ -124,7 +124,7 @@ def test_unreadable_candidate_is_unverified_not_different(
 
     monkeypatch.setattr(proposal_module.file_content, "sha256_digest", unreadable_digest)
 
-    proposal = generate_organisation_proposal(scan_result)
+    proposal = generate_content_verified_organisation_proposal(scan_result)
 
     unverified = placements_of(proposal, PlacementClassification.UNVERIFIED_CONFLICT)
     assert len(unverified) == 1
@@ -148,7 +148,7 @@ def test_unreadable_canonical_makes_all_comparisons_unverified(
         proposal_module.file_content, "sha256_digest", unreadable_canonical
     )
 
-    proposal = generate_organisation_proposal(scan_result)
+    proposal = generate_content_verified_organisation_proposal(scan_result)
 
     assert proposal.unverified_conflict_files == 2
     assert proposal.exact_duplicate_files == 0
@@ -163,7 +163,9 @@ def test_reports_collision_candidate_progress_and_existing_hash_bytes(
     )
     progress = []
 
-    proposal = generate_organisation_proposal(scan_result, progress.append)
+    proposal = generate_content_verified_organisation_proposal(
+        scan_result, progress.append
+    )
 
     assert progress[0].processed_candidates == 0
     assert progress[0].total_candidates == 2
@@ -183,6 +185,8 @@ def test_does_not_report_collision_progress_when_there_are_no_candidates(
     media_path.write_bytes(b"content")
     progress = []
 
-    generate_organisation_proposal(scan_media_collection(tmp_path), progress.append)
+    generate_content_verified_organisation_proposal(
+        scan_media_collection(tmp_path), progress.append
+    )
 
     assert progress == []

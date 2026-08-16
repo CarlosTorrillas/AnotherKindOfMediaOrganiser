@@ -23,14 +23,18 @@ Feature: Generate an Organisation Proposal
     When the user generates an Organisation Proposal
     Then only Recognised Media receives proposed destinations
 
-  Scenario: Detect destination collisions
-    Given two different Media Entries that produce the same proposed destination
+  Scenario: Route colliding names for review
+    Given multiple Media Entries compete for the same normal proposed destination
     When the user generates an Organisation Proposal
-    Then both Media Entries remain in the Organisation Proposal
-    And the destination collision is reported
+    Then one receives the deterministic canonical destination
+    And every remaining entry receives a unique deterministic nameConflicts destination
+
+  Scenario: Generate a proposal without content verification
+    Given a proposed destination collision whose file content cannot be read
+    When the user generates an Organisation Proposal
+    Then the Name Conflict is reported without reading file content
 
   Scenario: Proposal generation is read-only
     Given a Media Collection for proposal generation
     When the user generates an Organisation Proposal from the Media Collection
     Then the Media Collection remains unchanged
-
