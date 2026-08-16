@@ -29,6 +29,7 @@ def test_scan_command_prints_a_concise_summary(tmp_path: Path, capsys) -> None:
         "Audio: 1\n"
         "Unsupported: 4\n"
         "Directories scanned: 1\n"
+        "Scan complete: YES\n"
         "\n"
         "Recognised media:\n"
         ".jpg: 2\n"
@@ -44,6 +45,35 @@ def test_scan_command_prints_a_concise_summary(tmp_path: Path, capsys) -> None:
         ".ds_store: 1\n"
         "[no extension]: 1\n"
     )
+
+
+def test_scan_command_reports_incomplete_status_and_deterministic_sample(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    from another_kind_of_media_organiser import cli
+    from another_kind_of_media_organiser.domain.media import InaccessiblePath
+
+    real_result = cli.scan_media_collection(tmp_path)
+    inaccessible = tuple(
+        InaccessiblePath(tmp_path / f"private-{number:02d}", "Permission denied")
+        for number in reversed(range(12))
+    )
+    incomplete = type(real_result)(
+        **{**real_result.__dict__, "inaccessible_paths": inaccessible}
+    )
+    monkeypatch.setattr(cli, "scan_media_collection", lambda _path: incomplete)
+
+    assert main(["scan", str(tmp_path)]) == 0
+
+    output = capsys.readouterr().out
+    assert "Scan complete: NO" in output
+    assert "Inaccessible paths: 12" in output
+    examples = [line for line in output.splitlines() if line.startswith("  ")]
+    assert examples == [
+        f"  {tmp_path / f'private-{number:02d}'} (Permission denied)"
+        for number in range(10)
+    ]
+    assert "Showing 10 of 12 inaccessible paths" in output
 
 
 def test_scan_command_reports_a_missing_directory_without_a_traceback(
