@@ -13,6 +13,9 @@ from another_kind_of_media_organiser.domain.organisation import (
     ProposedPlacement,
 )
 from another_kind_of_media_organiser.infrastructure import file_content
+from another_kind_of_media_organiser.infrastructure.digest_cache import (
+    SqliteDigestCache,
+)
 
 
 _ENGLISH_MONTH_NAMES = (
@@ -54,6 +57,7 @@ class CollisionClassificationProgress:
     potential_conflict_files: int
     unverified_conflict_files: int
     bytes_hashed: int
+    cache_hits: int = 0
 
 
 ProgressCallback = Callable[[CollisionClassificationProgress], None]
@@ -65,6 +69,7 @@ class _ProgressTracker:
         self.callback = callback
         self.processed_candidates = 0
         self.bytes_hashed = 0
+        self.cache_hits = 0
         self.counts: Counter[PlacementClassification] = Counter()
 
     def report(self) -> None:
@@ -76,6 +81,7 @@ class _ProgressTracker:
                 self.counts[PlacementClassification.POTENTIAL_CONFLICT],
                 self.counts[PlacementClassification.UNVERIFIED_CONFLICT],
                 self.bytes_hashed,
+                self.cache_hits,
             )
         )
 
@@ -88,6 +94,10 @@ class _ProgressTracker:
         self.processed_candidates += 1
         self.report()
 
+    def cache_hit(self) -> None:
+        self.cache_hits += 1
+        self.report()
+
 
 def resolve_media_creation_date(media_entry: MediaEntry) -> datetime:
     """Resolve Media Creation Date using modification time as a temporary fallback."""
@@ -97,6 +107,8 @@ def resolve_media_creation_date(media_entry: MediaEntry) -> datetime:
 def generate_organisation_proposal(
     scan_result: ScanResult,
     progress_callback: ProgressCallback | None = None,
+    *,
+    digest_cache: SqliteDigestCache | None = None,
 ) -> OrganisationProposal:
     """Build and classify a deterministic, read-only organisation plan."""
     proposed = []
@@ -129,7 +141,7 @@ def generate_organisation_proposal(
     if progress is not None:
         progress.report()
 
-    digest_cache: dict[Path, str | None] = {}
+    run_digest_cache: dict[Path, str | None] = {}
     size_cache: dict[Path, int | None] = {}
     review_counts: Counter[tuple[Path, PlacementClassification]] = Counter()
     placements = []
@@ -165,8 +177,10 @@ def generate_organisation_proposal(
             group[0][0].path,
             entry.path,
             size_cache,
+            run_digest_cache,
             digest_cache,
             progress.add_hashed_bytes if progress is not None else None,
+            progress.cache_hit if progress is not None else None,
         )
         if progress is not None:
             progress.complete(classification)
@@ -196,7 +210,9 @@ def _classify_against_canonical(
     candidate_path: Path,
     size_cache: dict[Path, int | None],
     digest_cache: dict[Path, str | None],
+    digest_cache_store: SqliteDigestCache | None,
     on_bytes_hashed: Callable[[int], None] | None = None,
+    on_cache_hit: Callable[[], None] | None = None,
 ) -> PlacementClassification:
     canonical_size = _size(canonical_path, size_cache)
     candidate_size = _size(candidate_path, size_cache)
@@ -206,10 +222,22 @@ def _classify_against_canonical(
     if canonical_size != candidate_size:
         return PlacementClassification.POTENTIAL_CONFLICT
 
-    canonical_digest = _digest(canonical_path, digest_cache, on_bytes_hashed)
+    canonical_digest = _digest(
+        canonical_path,
+        digest_cache,
+        digest_cache_store,
+        on_bytes_hashed,
+        on_cache_hit,
+    )
     if canonical_digest is None:
         return PlacementClassification.UNVERIFIED_CONFLICT
-    candidate_digest = _digest(candidate_path, digest_cache, on_bytes_hashed)
+    candidate_digest = _digest(
+        candidate_path,
+        digest_cache,
+        digest_cache_store,
+        on_bytes_hashed,
+        on_cache_hit,
+    )
     if candidate_digest is None:
         return PlacementClassification.UNVERIFIED_CONFLICT
     if candidate_digest == canonical_digest:
@@ -229,15 +257,50 @@ def _size(path: Path, cache: dict[Path, int | None]) -> int | None:
 def _digest(
     path: Path,
     cache: dict[Path, str | None],
+    persistent_cache: SqliteDigestCache | None,
     on_bytes_hashed: Callable[[int], None] | None = None,
+    on_cache_hit: Callable[[], None] | None = None,
 ) -> str | None:
     if path not in cache:
         try:
+            metadata_before = path.stat()
+            if persistent_cache is not None:
+                cached_digest = persistent_cache.lookup(
+                    path, metadata_before.st_size, metadata_before.st_mtime_ns
+                )
+                if cached_digest is not None:
+                    metadata_after_lookup = path.stat()
+                    cache_entry_still_valid = (
+                        metadata_after_lookup.st_size == metadata_before.st_size
+                        and metadata_after_lookup.st_mtime_ns
+                        == metadata_before.st_mtime_ns
+                    )
+                    if not cache_entry_still_valid:
+                        cache[path] = None
+                        return cache[path]
+                    cache[path] = cached_digest
+                    if on_cache_hit is not None:
+                        on_cache_hit()
+                    return cache[path]
             if on_bytes_hashed is None:
                 cache[path] = file_content.sha256_digest(path)
             else:
                 cache[path] = file_content.sha256_digest(
                     path, on_bytes_read=on_bytes_hashed
+                )
+            metadata_after = path.stat()
+            unchanged = (
+                metadata_after.st_size == metadata_before.st_size
+                and metadata_after.st_mtime_ns == metadata_before.st_mtime_ns
+            )
+            if not unchanged:
+                cache[path] = None
+            elif persistent_cache is not None and cache[path] is not None:
+                persistent_cache.store(
+                    path,
+                    metadata_after.st_size,
+                    metadata_after.st_mtime_ns,
+                    cache[path],
                 )
         except OSError:
             cache[path] = None

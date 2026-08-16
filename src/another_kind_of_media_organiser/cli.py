@@ -1,6 +1,7 @@
 """Command-line interface for AnotherKindOfMediaOrganiser."""
 
 import argparse
+import sqlite3
 import sys
 import time
 from collections import Counter
@@ -20,6 +21,10 @@ from another_kind_of_media_organiser.domain.media import MediaCategory, ScanResu
 from another_kind_of_media_organiser.domain.organisation import (
     OrganisationProposal,
     PlacementClassification,
+)
+from another_kind_of_media_organiser.infrastructure.digest_cache import (
+    SqliteDigestCache,
+    default_digest_cache_path,
 )
 
 
@@ -115,7 +120,8 @@ class _CollisionProgressReporter:
             f"({percentage}%) | exact {progress.exact_duplicate_files} | "
             f"potential {progress.potential_conflict_files} | "
             f"unverified {progress.unverified_conflict_files} | "
-            f"hashed {_format_bytes(progress.bytes_hashed)}"
+            f"cache hits {progress.cache_hits} | "
+            f"hashed this run {_format_bytes(progress.bytes_hashed)}"
         )
 
 
@@ -235,12 +241,20 @@ def main(arguments: Sequence[str] | None = None) -> int:
             _print_summary(result)
         else:
             progress_reporter = _CollisionProgressReporter(sys.stderr)
+            digest_cache = _open_digest_cache()
             try:
-                proposal = generate_organisation_proposal(result, progress_reporter)
+                proposal = generate_organisation_proposal(
+                    result,
+                    progress_reporter,
+                    digest_cache=digest_cache,
+                )
             except KeyboardInterrupt:
                 progress_reporter.cancel()
                 _print_proposal_cancellation()
                 return 130
+            finally:
+                if digest_cache is not None:
+                    digest_cache.close()
             _print_proposal_summary(proposal)
     else:
         print("AnotherKindOfMediaOrganiser")
@@ -250,3 +264,10 @@ def main(arguments: Sequence[str] | None = None) -> int:
 def _print_proposal_cancellation() -> None:
     print("Proposal generation cancelled.", file=sys.stderr)
     print("No files have been changed.", file=sys.stderr)
+
+
+def _open_digest_cache() -> SqliteDigestCache | None:
+    try:
+        return SqliteDigestCache(default_digest_cache_path())
+    except (OSError, sqlite3.Error):
+        return None
