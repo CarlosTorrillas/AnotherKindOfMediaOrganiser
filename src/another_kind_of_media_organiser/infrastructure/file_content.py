@@ -26,3 +26,16 @@ def sha256_digest(
             if on_bytes_read is not None:
                 on_bytes_read(len(chunk))
     return digest.hexdigest()
+
+
+def verify_identical(source: Path, destination: Path) -> None:
+    """Verify current source and destination bytes without using cached evidence."""
+    if source.stat().st_size != destination.stat().st_size:
+        raise ValueError("source and destination sizes differ")
+    if sha256_digest(source) != sha256_digest(destination):
+        raise ValueError("source and destination SHA-256 digests differ")
+
+
+def delete_file(path: Path) -> None:
+    """Delete one verified source media file."""
+    path.unlink()

@@ -13,8 +13,11 @@ from typing import TextIO
 from another_kind_of_media_organiser.application.execute_organisation_proposal import (
     DestinationConflictError,
     OrganisationCopyError,
+    OrganisationDeletionError,
+    OrganisationExecutionMode,
     OrganisationExecutionPlan,
     OrganisationExecutionProgress,
+    OrganisationVerificationError,
     UnsafeDestinationError,
     execute_organisation_plan,
     prepare_organisation_execution,
@@ -137,7 +140,7 @@ class _CollisionProgressReporter:
 
 
 class _CopyProgressReporter:
-    def __init__(self, total_files: int, output: TextIO = sys.stderr) -> None:
+    def __init__(self, total_files: int, output: TextIO = sys.stderr, *, move: bool = False) -> None:
         self.output = output
         self.interactive = output.isatty()
         self.last_progress = OrganisationExecutionProgress(0, total_files, 0)
@@ -145,13 +148,22 @@ class _CopyProgressReporter:
         self.next_file_milestone = 0
         self.next_byte_milestone = _NON_INTERACTIVE_BYTE_MILESTONE
         self.max_line_length = 0
+        self.move = move
 
     def __call__(self, progress: OrganisationExecutionProgress) -> None:
         self.last_progress = progress
-        line = (
-            f"Copying media: Files {progress.files_copied} / "
-            f"{progress.total_files} | Copied {_format_bytes(progress.bytes_copied)}"
-        )
+        if self.move:
+            line = (
+                f"Moving media: Files {progress.files_copied} / {progress.total_files} | "
+                f"Moved {_format_bytes(progress.bytes_copied)} | "
+                f"Verified {progress.files_verified} | "
+                f"Source files deleted {progress.source_files_deleted}"
+            )
+        else:
+            line = (
+                f"Copying media: Files {progress.files_copied} / "
+                f"{progress.total_files} | Copied {_format_bytes(progress.bytes_copied)}"
+            )
         if self.interactive:
             self.max_line_length = max(self.max_line_length, len(line))
             ending = "\n" if progress.files_copied == progress.total_files else ""
@@ -167,7 +179,11 @@ class _CopyProgressReporter:
         reached_file_milestone = (
             progress.files_copied >= self.next_file_milestone
         )
-        if reached_file_milestone or reached_byte_milestone:
+        move_completed = (
+            self.move
+            and progress.source_files_deleted == progress.total_files
+        )
+        if reached_file_milestone or reached_byte_milestone or move_completed:
             print(line, file=self.output, flush=True)
             while self.next_file_milestone <= progress.files_copied:
                 self.next_file_milestone += self.file_milestone
@@ -209,6 +225,11 @@ def _build_parser() -> argparse.ArgumentParser:
     organise_parser.add_argument("directory", type=Path, metavar="SOURCE")
     organise_parser.add_argument(
         "--destination", required=True, type=Path, metavar="DESTINATION"
+    )
+    organise_parser.add_argument(
+        "--move",
+        action="store_true",
+        help="copy, verify, then delete each source file (default: copy)",
     )
     return parser
 
@@ -351,7 +372,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
             if parsed_arguments.command == "scan":
                 raise
             if parsed_arguments.command == "organise":
-                _print_organisation_cancellation(0, 0)
+                _print_organisation_cancellation(
+                    0, 0, move=parsed_arguments.move
+                )
                 return 130
             _print_cancellation(parsed_arguments.command)
             return 130
@@ -405,7 +428,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
                 print(f"Organisation preflight failed: {error}", file=sys.stderr)
                 print("No media files have been copied.", file=sys.stderr)
                 return 2
-            return _confirm_and_execute(plan)
+            return _confirm_and_execute(plan, move=parsed_arguments.move)
     else:
         print("AnotherKindOfMediaOrganiser")
     return 0
@@ -428,35 +451,61 @@ def _verify_collisions(result: ScanResult) -> OrganisationProposal:
             digest_cache.close()
 
 
-def _confirm_and_execute(plan: OrganisationExecutionPlan) -> int:
+def _confirm_and_execute(plan: OrganisationExecutionPlan, *, move: bool = False) -> int:
     print("Organisation execution")
     print(f"\nSource:\n  {plan.source_root}")
     print(f"\nDestination:\n  {plan.destination_root}")
-    print(f"\nMedia files to copy: {len(plan.items)}")
+    action = "move" if move else "copy"
+    print(f"\nMedia files to {action}: {len(plan.items)}")
     print(f"Name conflicts: {plan.name_conflict_files}")
-    print("\nOperation: COPY")
-    print("\nSource files will NOT be modified or deleted.")
+    print(f"\nOperation: {'MOVE' if move else 'COPY'}")
+    if move:
+        print("\nEach file will be copied and verified before its original is deleted.")
+        print("\nTHIS OPERATION WILL DELETE SOURCE FILES.")
+    else:
+        print("\nSource files will NOT be modified or deleted.")
     try:
         answer = input("\nContinue? [y/N] ")
     except EOFError:
         answer = ""
     except KeyboardInterrupt:
-        print("\nOrganisation cancelled before copying.")
+        print(f"\nOrganisation cancelled before {'moving' if move else 'copying'}.")
         return 130
     if answer.strip().lower() not in {"y", "yes"}:
-        print("Organisation cancelled before copying.")
+        print(f"Organisation cancelled before {'moving' if move else 'copying'}.")
         return 0
 
-    reporter = _CopyProgressReporter(len(plan.items), sys.stderr)
+    reporter = _CopyProgressReporter(len(plan.items), sys.stderr, move=move)
     try:
-        result = execute_organisation_plan(plan, reporter)
+        if move:
+            result = execute_organisation_plan(
+                plan, reporter, mode=OrganisationExecutionMode.MOVE
+            )
+        else:
+            result = execute_organisation_plan(plan, reporter)
     except KeyboardInterrupt:
         reporter.cancel()
         _print_organisation_cancellation(
             reporter.last_progress.files_copied,
             reporter.last_progress.total_files,
+            move=move,
+            files_verified=reporter.last_progress.files_verified,
+            source_files_deleted=reporter.last_progress.source_files_deleted,
         )
         return 130
+    except OrganisationVerificationError as error:
+        reporter.cancel()
+        print("Organisation verification failed.", file=sys.stderr)
+        print(f"Failed source: {error.source}", file=sys.stderr)
+        print(f"Failed destination: {error.destination}", file=sys.stderr)
+        print("Source file was not deleted.", file=sys.stderr)
+        return 1
+    except OrganisationDeletionError as error:
+        reporter.cancel()
+        print("Source deletion failed after COPY+VERIFY succeeded.", file=sys.stderr)
+        print(f"Source remains: {error.source}", file=sys.stderr)
+        print(f"Verified destination remains: {error.destination}", file=sys.stderr)
+        return 1
     except OrganisationCopyError as error:
         reporter.cancel()
         print("Organisation execution failed.", file=sys.stderr)
@@ -466,7 +515,12 @@ def _confirm_and_execute(plan: OrganisationExecutionPlan) -> int:
             f"Files copied: {error.files_copied} / {error.total_files}",
             file=sys.stderr,
         )
-        print("Source files have not been modified.", file=sys.stderr)
+        if move:
+            print("The failed source file was not deleted.", file=sys.stderr)
+            print("Previously completed verified moves remain completed.", file=sys.stderr)
+            print("No rollback was attempted.", file=sys.stderr)
+        else:
+            print("Source files have not been modified.", file=sys.stderr)
         print(
             "Destination may contain successfully completed copies.",
             file=sys.stderr,
@@ -476,14 +530,30 @@ def _confirm_and_execute(plan: OrganisationExecutionPlan) -> int:
     print("\nOrganisation completed.")
     print(f"Files copied: {result.files_copied} / {result.total_files}")
     print(f"Data copied: {_format_bytes(result.bytes_copied)}")
-    print("Source files have not been modified.")
+    if move:
+        print(f"Verified: {result.files_verified}")
+        print(f"Source files deleted: {result.source_files_deleted}")
+    else:
+        print("Source files have not been modified.")
     return 0
 
 
-def _print_organisation_cancellation(files_copied: int, total_files: int) -> None:
+def _print_organisation_cancellation(
+    files_copied: int,
+    total_files: int,
+    *,
+    move: bool = False,
+    files_verified: int = 0,
+    source_files_deleted: int = 0,
+) -> None:
     print("Organisation cancelled.", file=sys.stderr)
     print(f"Files copied: {files_copied} / {total_files}", file=sys.stderr)
-    print("Source files have not been modified.", file=sys.stderr)
+    if move:
+        print(f"Files verified: {files_verified}", file=sys.stderr)
+        print(f"Source files deleted: {source_files_deleted}", file=sys.stderr)
+        print("No rollback was attempted.", file=sys.stderr)
+    else:
+        print("Source files have not been modified.", file=sys.stderr)
     print(
         "Destination contains successfully completed copies.",
         file=sys.stderr,

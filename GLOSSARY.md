@@ -67,7 +67,15 @@ A read-only plan showing how Recognised Media could be organised without changin
 
 ## Organisation Execution
 
-The explicit application of an accepted Organisation Proposal to a Destination Collection. The current implementation performs COPY only: it creates required destination directories and copies each source Media Entry to its exact Proposed Placement. It never moves, deletes, renames, or modifies source media, and never silently overwrites an existing destination file.
+The explicit application of an accepted Organisation Proposal to a Destination Collection. It never silently overwrites an existing destination file. COPY and MOVE Organisation Execution use the same proposal and complete safety preflight.
+
+## COPY Organisation Execution
+
+Organisation Execution that creates each Proposed Placement in the Destination Collection while leaving every source Media Entry unchanged. COPY is always the default mode.
+
+## MOVE Organisation Execution
+
+Organisation Execution in which a successfully moved Media Entry exists at its Proposed Placement and its original source is removed only after the completed destination has been verified as byte-for-byte identical. A failed or incomplete verification never authorises source deletion.
 
 ## Proposed Placement
 

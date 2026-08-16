@@ -70,7 +70,9 @@ def test_organise_refuses_incomplete_scan_before_any_write(
     monkeypatch.setattr("builtins.input", unexpected_action)
 
     assert (
-        cli.main(["organise", str(source), "--destination", str(destination)])
+        cli.main(
+            ["organise", str(source), "--destination", str(destination), "--move"]
+        )
         == 2
     )
 
