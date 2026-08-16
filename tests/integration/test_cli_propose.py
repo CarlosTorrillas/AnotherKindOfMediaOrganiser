@@ -2,7 +2,56 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
+from another_kind_of_media_organiser import cli
 from another_kind_of_media_organiser.cli import main
+
+
+@pytest.fixture(autouse=True)
+def isolated_digest_cache(tmp_path: Path, monkeypatch) -> None:
+    cache_path = tmp_path.parent / f"{tmp_path.name}-hash-cache.sqlite3"
+    monkeypatch.setattr(cli, "default_digest_cache_path", lambda: cache_path)
+
+
+def test_cli_cache_is_created_outside_the_media_collection(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    collection = tmp_path / "media"
+    cache_path = tmp_path / "user-cache" / "hash-cache.sqlite3"
+    date = datetime(2024, 1, 3, tzinfo=timezone.utc)
+    create_collision(collection, "IMG_001.jpg", date, ("a", "b"))
+    monkeypatch.setattr(cli, "default_digest_cache_path", lambda: cache_path)
+
+    assert main(["propose", str(collection)]) == 0
+
+    capsys.readouterr()
+    assert cache_path.is_file()
+    sqlite_files = (path for path in collection.rglob("*") if path.is_file())
+    assert not any(path.suffix == ".sqlite3" for path in sqlite_files)
+
+
+def test_unavailable_cache_falls_back_to_verified_content_comparison(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    collection = tmp_path / "media"
+    first, second = create_collision(
+        collection,
+        "IMG_001.jpg",
+        datetime(2024, 1, 3, tzinfo=timezone.utc),
+        ("a", "b"),
+    )
+    first.write_bytes(b"aaaa")
+    second.write_bytes(b"bbbb")
+    broken_cache = tmp_path / "broken-cache.sqlite3"
+    broken_cache.write_bytes(b"not a sqlite database")
+    monkeypatch.setattr(cli, "default_digest_cache_path", lambda: broken_cache)
+
+    assert main(["propose", str(collection)]) == 0
+
+    captured = capsys.readouterr()
+    assert "Exact duplicate files: 0" in captured.out
+    assert "Potential conflict files: 1" in captured.out
 
 
 def set_modification_date(path: Path, date: datetime) -> None:
@@ -33,18 +82,23 @@ def test_propose_command_prints_a_read_only_summary(tmp_path: Path, capsys) -> N
     exit_code = main(["propose", str(tmp_path)])
 
     assert exit_code == 0
-    assert capsys.readouterr().out == (
+    captured = capsys.readouterr()
+    assert captured.out == (
         "Organisation proposal\n"
         "No files have been changed.\n"
         "\n"
         "Media files: 2\n"
         "Proposed destinations: 2\n"
-        "Collisions: 0\n"
+        "Destination collisions: 0\n"
+        "Exact duplicate files: 0\n"
+        "Potential conflict files: 0\n"
+        "Unverified conflict files: 0\n"
         "\n"
         "Years:\n"
         "2023: 1\n"
         "2024: 1\n"
     )
+    assert captured.err == ""
 
 
 def test_propose_command_displays_a_collision_and_all_competing_sources(
@@ -67,7 +121,10 @@ def test_propose_command_displays_a_collision_and_all_competing_sources(
         "\n"
         "Media files: 3\n"
         "Proposed destinations: 3\n"
-        "Collisions: 1\n"
+        "Destination collisions: 1\n"
+        "Exact duplicate files: 2\n"
+        "Potential conflict files: 0\n"
+        "Unverified conflict files: 0\n"
         "\n"
         "Years:\n"
         "2024: 3\n"
@@ -75,9 +132,12 @@ def test_propose_command_displays_a_collision_and_all_competing_sources(
         "Collision examples:\n"
         "\n"
         "2024/01-January/IMAGE/IMG_001.jpg\n"
-        f"  - {third}\n"
-        f"  - {first}\n"
-        f"  - {second}\n"
+        "  canonical:\n"
+        f"    {third}\n"
+        "  exact duplicate:\n"
+        f"    {first}\n"
+        "  exact duplicate:\n"
+        f"    {second}\n"
         "\n"
         "Showing 1 of 1 collisions\n"
     )
@@ -111,5 +171,45 @@ def test_propose_command_shows_at_most_ten_deterministic_collision_examples(
     ]
     assert "IMG_010.jpg\n" not in first_output
     assert "IMG_011.jpg\n" not in first_output
-    assert "Collisions: 12\n" in first_output
+    assert "Destination collisions: 12\n" in first_output
+    assert "Exact duplicate files: 12\n" in first_output
+    assert "Potential conflict files: 0\n" in first_output
+    assert "Unverified conflict files: 0\n" in first_output
     assert "Showing 10 of 12 collisions\n" in first_output
+
+
+def test_non_interactive_progress_uses_plain_periodic_lines(
+    tmp_path: Path, capsys
+) -> None:
+    date = datetime(2024, 1, 3, tzinfo=timezone.utc)
+    create_collision(tmp_path, "IMG_001.jpg", date, ("a", "b", "c"))
+
+    assert main(["propose", str(tmp_path)]) == 0
+
+    progress_output = capsys.readouterr().err
+    assert "Collision classification: 0/2 files" in progress_output
+    assert "Collision classification: 2/2 files" in progress_output
+    assert "\r" not in progress_output
+    assert "\x1b" not in progress_output
+
+
+def test_ctrl_c_during_proposal_reports_safe_cancellation(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    media_path = tmp_path / "photo.jpg"
+    media_path.write_bytes(b"valuable media")
+
+    def interrupted_proposal(*_args, **_kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "generate_organisation_proposal", interrupted_proposal)
+
+    assert main(["propose", str(tmp_path)]) == 130
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == (
+        "Proposal generation cancelled.\n"
+        "No files have been changed.\n"
+    )
+    assert media_path.read_bytes() == b"valuable media"
