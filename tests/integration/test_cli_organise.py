@@ -41,6 +41,15 @@ def test_accepting_confirmation_copies_the_lightweight_proposal(
     destination = tmp_path / "destination"
     monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
 
+    def unexpected_verification(*_args, **_kwargs):
+        raise AssertionError("organise must use the lightweight proposal")
+
+    monkeypatch.setattr(
+        cli,
+        "generate_content_verified_organisation_proposal",
+        unexpected_verification,
+    )
+
     assert main(["organise", str(source), "--destination", str(destination)]) == 0
 
     captured = capsys.readouterr()
@@ -100,4 +109,36 @@ def test_ctrl_c_reports_partial_completion_safely(
     captured = capsys.readouterr()
     assert "Organisation cancelled." in captured.err
     assert "Source files have not been modified." in captured.err
+    assert media.read_bytes() == b"source"
+
+
+def test_runtime_failure_reports_partial_destination_state(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    media = source / "photo.jpg"
+    media.write_bytes(b"source")
+    destination = tmp_path / "destination"
+    monkeypatch.setattr("builtins.input", lambda _prompt: "y")
+
+    def failed_execution(plan, _progress):
+        item = plan.items[0]
+        raise cli.OrganisationCopyError(
+            item.source,
+            item.destination,
+            0,
+            len(plan.items),
+            OSError("disk full"),
+        )
+
+    monkeypatch.setattr(cli, "execute_organisation_plan", failed_execution)
+
+    assert main(["organise", str(source), "--destination", str(destination)]) == 1
+
+    captured = capsys.readouterr()
+    assert "Organisation execution failed." in captured.err
+    assert f"Failed source: {media}" in captured.err
+    assert "Files copied: 0 / 1" in captured.err
+    assert "Destination may contain successfully completed copies." in captured.err
     assert media.read_bytes() == b"source"

@@ -65,6 +65,23 @@ def test_preflight_rejects_a_destination_that_escapes_the_root(
         )
 
 
+def test_preflight_rejects_a_destination_symlink_that_escapes_the_root(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    outside = tmp_path / "outside"
+    destination.mkdir()
+    outside.mkdir()
+    (destination / "2024").symlink_to(outside, target_is_directory=True)
+    proposal = proposal_for(source, {"photo.jpg": b"valuable"})
+
+    with pytest.raises(UnsafeDestinationError):
+        prepare_organisation_execution(proposal, source, destination)
+
+    assert tuple(outside.iterdir()) == ()
+
+
 def test_preflight_finds_every_existing_destination_before_copying(
     tmp_path: Path,
 ) -> None:

@@ -10,6 +10,15 @@ from math import ceil
 from pathlib import Path
 from typing import TextIO
 
+from another_kind_of_media_organiser.application.execute_organisation_proposal import (
+    DestinationConflictError,
+    OrganisationCopyError,
+    OrganisationExecutionPlan,
+    OrganisationExecutionProgress,
+    UnsafeDestinationError,
+    execute_organisation_plan,
+    prepare_organisation_execution,
+)
 from another_kind_of_media_organiser.application.generate_organisation_proposal import (
     CollisionClassificationProgress,
     generate_content_verified_organisation_proposal,
@@ -126,6 +135,49 @@ class _CollisionProgressReporter:
         )
 
 
+class _CopyProgressReporter:
+    def __init__(self, total_files: int, output: TextIO = sys.stderr) -> None:
+        self.output = output
+        self.interactive = output.isatty()
+        self.last_progress = OrganisationExecutionProgress(0, total_files, 0)
+        self.file_milestone = max(1, ceil(total_files / 20))
+        self.next_file_milestone = 0
+        self.next_byte_milestone = _NON_INTERACTIVE_BYTE_MILESTONE
+        self.max_line_length = 0
+
+    def __call__(self, progress: OrganisationExecutionProgress) -> None:
+        self.last_progress = progress
+        line = (
+            f"Copying media: Files {progress.files_copied} / "
+            f"{progress.total_files} | Copied {_format_bytes(progress.bytes_copied)}"
+        )
+        if self.interactive:
+            self.max_line_length = max(self.max_line_length, len(line))
+            ending = "\n" if progress.files_copied == progress.total_files else ""
+            print(
+                f"\r{line.ljust(self.max_line_length)}",
+                end=ending,
+                file=self.output,
+                flush=True,
+            )
+            return
+
+        reached_byte_milestone = progress.bytes_copied >= self.next_byte_milestone
+        reached_file_milestone = (
+            progress.files_copied >= self.next_file_milestone
+        )
+        if reached_file_milestone or reached_byte_milestone:
+            print(line, file=self.output, flush=True)
+            while self.next_file_milestone <= progress.files_copied:
+                self.next_file_milestone += self.file_milestone
+            while self.next_byte_milestone <= progress.bytes_copied:
+                self.next_byte_milestone += _NON_INTERACTIVE_BYTE_MILESTONE
+
+    def cancel(self) -> None:
+        if self.interactive:
+            print(file=self.output)
+
+
 def _format_bytes(count: int) -> str:
     value = float(count)
     for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
@@ -149,6 +201,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="deeply verify the content of destination collisions",
     )
     verify_parser.add_argument("directory", type=Path)
+    organise_parser = subcommands.add_parser(
+        "organise",
+        help="copy an accepted lightweight proposal to a separate destination",
+    )
+    organise_parser.add_argument("directory", type=Path, metavar="SOURCE")
+    organise_parser.add_argument(
+        "--destination", required=True, type=Path, metavar="DESTINATION"
+    )
     return parser
 
 
@@ -243,7 +303,12 @@ def _print_collision_examples(proposal: OrganisationProposal) -> None:
 def main(arguments: Sequence[str] | None = None) -> int:
     """Run the command-line interface."""
     parsed_arguments = _build_parser().parse_args(arguments)
-    if parsed_arguments.command in {"scan", "propose", "verify-collisions"}:
+    if parsed_arguments.command in {
+        "scan",
+        "propose",
+        "verify-collisions",
+        "organise",
+    }:
         try:
             result = scan_media_collection(parsed_arguments.directory)
         except NotADirectoryError:
@@ -255,6 +320,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
         except KeyboardInterrupt:
             if parsed_arguments.command == "scan":
                 raise
+            if parsed_arguments.command == "organise":
+                _print_organisation_cancellation(0, 0)
+                return 130
             _print_cancellation(parsed_arguments.command)
             return 130
         if parsed_arguments.command == "scan":
@@ -266,7 +334,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
                 _print_cancellation(parsed_arguments.command)
                 return 130
             _print_proposal_summary(proposal)
-        else:
+        elif parsed_arguments.command == "verify-collisions":
             print("Verifying destination collisions...")
             print("This may take a long time for large collections.\n")
             try:
@@ -275,6 +343,19 @@ def main(arguments: Sequence[str] | None = None) -> int:
                 _print_cancellation(parsed_arguments.command)
                 return 130
             _print_verification_summary(proposal)
+        else:
+            try:
+                proposal = generate_organisation_proposal(result)
+                plan = prepare_organisation_execution(
+                    proposal,
+                    parsed_arguments.directory,
+                    parsed_arguments.destination,
+                )
+            except (UnsafeDestinationError, DestinationConflictError, OSError) as error:
+                print(f"Organisation preflight failed: {error}", file=sys.stderr)
+                print("No media files have been copied.", file=sys.stderr)
+                return 2
+            return _confirm_and_execute(plan)
     else:
         print("AnotherKindOfMediaOrganiser")
     return 0
@@ -295,6 +376,68 @@ def _verify_collisions(result: ScanResult) -> OrganisationProposal:
     finally:
         if digest_cache is not None:
             digest_cache.close()
+
+
+def _confirm_and_execute(plan: OrganisationExecutionPlan) -> int:
+    print("Organisation execution")
+    print(f"\nSource:\n  {plan.source_root}")
+    print(f"\nDestination:\n  {plan.destination_root}")
+    print(f"\nMedia files to copy: {len(plan.items)}")
+    print(f"Name conflicts: {plan.name_conflict_files}")
+    print("\nOperation: COPY")
+    print("\nSource files will NOT be modified or deleted.")
+    try:
+        answer = input("\nContinue? [y/N] ")
+    except EOFError:
+        answer = ""
+    except KeyboardInterrupt:
+        print("\nOrganisation cancelled before copying.")
+        return 130
+    if answer.strip().lower() not in {"y", "yes"}:
+        print("Organisation cancelled before copying.")
+        return 0
+
+    reporter = _CopyProgressReporter(len(plan.items), sys.stderr)
+    try:
+        result = execute_organisation_plan(plan, reporter)
+    except KeyboardInterrupt:
+        reporter.cancel()
+        _print_organisation_cancellation(
+            reporter.last_progress.files_copied,
+            reporter.last_progress.total_files,
+        )
+        return 130
+    except OrganisationCopyError as error:
+        reporter.cancel()
+        print("Organisation execution failed.", file=sys.stderr)
+        print(f"Failed source: {error.source}", file=sys.stderr)
+        print(f"Failed destination: {error.destination}", file=sys.stderr)
+        print(
+            f"Files copied: {error.files_copied} / {error.total_files}",
+            file=sys.stderr,
+        )
+        print("Source files have not been modified.", file=sys.stderr)
+        print(
+            "Destination may contain successfully completed copies.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print("\nOrganisation completed.")
+    print(f"Files copied: {result.files_copied} / {result.total_files}")
+    print(f"Data copied: {_format_bytes(result.bytes_copied)}")
+    print("Source files have not been modified.")
+    return 0
+
+
+def _print_organisation_cancellation(files_copied: int, total_files: int) -> None:
+    print("Organisation cancelled.", file=sys.stderr)
+    print(f"Files copied: {files_copied} / {total_files}", file=sys.stderr)
+    print("Source files have not been modified.", file=sys.stderr)
+    print(
+        "Destination contains successfully completed copies.",
+        file=sys.stderr,
+    )
 
 
 def _print_cancellation(command: str) -> None:

@@ -23,6 +23,7 @@ media-organiser
 media-organiser scan /path/to/media
 media-organiser propose /path/to/media
 media-organiser verify-collisions /path/to/media
+media-organiser organise /path/to/media --destination /separate/organised-media
 pytest
 behave
 ```
@@ -38,6 +39,14 @@ Conflicts, or Unverified Conflicts using size-first, chunked SHA-256 comparison.
 Completed hashes are cached outside the Media Collection and reused between
 runs. Both commands produce read-only plans and never create their proposed
 review directories.
+
+The `organise` command is the only writing workflow. It displays the complete
+lightweight execution summary and defaults confirmation to No before copying to
+a separate destination. Source media is never moved, deleted, renamed, or
+modified. Preflight rejects unsafe source/destination relationships and every
+existing planned destination before the first copy. Completed files are kept if
+a later runtime failure occurs; incomplete copies use distinguishable temporary
+files and are cleaned up on a best-effort basis.
 
 The initial supported extensions are `.jpg`, `.jpeg`, `.png`, `.heic`, `.arw`, `.cr2`, `.nef`, `.mp4`, `.mov`, and `.m4v`, matched case-insensitively. Other files are reported as unsupported rather than silently ignored.
 

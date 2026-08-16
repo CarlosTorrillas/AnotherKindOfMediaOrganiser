@@ -4,7 +4,11 @@ This glossary defines the shared business vocabulary of AnotherKindOfMediaOrgani
 
 ## Media Collection
 
-The root directory selected by the user for scanning. A Media Collection may contain files and nested directories.
+The source root directory selected by the user for scanning. A Media Collection may contain files and nested directories. Organisation Execution treats it as read-only and never uses it as the Destination Collection.
+
+## Destination Collection
+
+A separate root directory that receives organised copies during Organisation Execution. Its structure comes from an accepted Organisation Proposal. It must neither be inside nor contain the source Media Collection.
 
 ## Scan
 
@@ -56,6 +60,10 @@ The date that best represents when media was originally created or captured. Org
 ## Organisation Proposal
 
 A read-only plan showing how Recognised Media could be organised without changing the source Media Collection. It contains one Proposed Placement for every recognised Media Entry, detects Destination Collisions, and routes Name Conflicts to a review location. Generating the standard proposal does not inspect file content or classify files as identical or different, and performs no organisation operation.
+
+## Organisation Execution
+
+The explicit application of an accepted Organisation Proposal to a Destination Collection. The current implementation performs COPY only: it creates required destination directories and copies each source Media Entry to its exact Proposed Placement. It never moves, deletes, renames, or modifies source media, and never silently overwrites an existing destination file.
 
 ## Proposed Placement
 
