@@ -6,7 +6,7 @@ from pathlib import Path
 from behave import given, then, when
 
 from another_kind_of_media_organiser.application.generate_organisation_proposal import (
-    generate_organisation_proposal,
+    generate_content_verified_organisation_proposal,
 )
 from another_kind_of_media_organiser.application.scan_media_collection import (
     scan_media_collection,
@@ -85,14 +85,18 @@ def step_classify_collision(context) -> None:
     scan_result = getattr(context, "scan_result", None) or scan_media_collection(
         context.collection
     )
-    context.proposal = generate_organisation_proposal(scan_result)
+    context.proposal = generate_content_verified_organisation_proposal(scan_result)
 
 
 @when("the Organisation Proposal is generated repeatedly")
 def step_generate_repeatedly(context) -> None:
     scan_result = scan_media_collection(context.collection)
-    context.first_proposal = generate_organisation_proposal(scan_result)
-    context.second_proposal = generate_organisation_proposal(scan_result)
+    context.first_proposal = generate_content_verified_organisation_proposal(
+        scan_result
+    )
+    context.second_proposal = generate_content_verified_organisation_proposal(
+        scan_result
+    )
 
 
 def _placements(context, classification: PlacementClassification):
@@ -205,4 +209,3 @@ def step_classification_read_only(context) -> None:
     }
     assert paths_after == context.paths_before
     assert state_after == context.state_before
-

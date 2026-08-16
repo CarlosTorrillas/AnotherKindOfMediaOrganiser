@@ -61,6 +61,7 @@ class CollisionClassificationProgress:
 
 
 ProgressCallback = Callable[[CollisionClassificationProgress], None]
+ProposedItem = tuple[MediaEntry, datetime, Path]
 
 
 class _ProgressTracker:
@@ -104,32 +105,50 @@ def resolve_media_creation_date(media_entry: MediaEntry) -> datetime:
     return media_entry.modification_date
 
 
-def generate_organisation_proposal(
+def generate_organisation_proposal(scan_result: ScanResult) -> OrganisationProposal:
+    """Build a deterministic proposal without inspecting file content."""
+    proposed, groups, collision_destinations = _prepare_proposal(scan_result)
+    conflict_counts: Counter[Path] = Counter()
+    placements = []
+    for entry, creation_date, normal_destination in proposed:
+        group = groups[normal_destination]
+        if len(group) == 1:
+            classification = PlacementClassification.NORMAL
+            destination = normal_destination
+            has_collision = False
+        elif entry is group[0][0]:
+            classification = PlacementClassification.CANONICAL
+            destination = normal_destination
+            has_collision = True
+        else:
+            classification = PlacementClassification.NAME_CONFLICT
+            conflict_counts[normal_destination] += 1
+            destination = _name_conflict_destination(
+                normal_destination, conflict_counts[normal_destination]
+            )
+            has_collision = True
+        placements.append(
+            _placement(
+                entry,
+                creation_date,
+                destination,
+                normal_destination,
+                classification,
+                has_collision=has_collision,
+            )
+        )
+    return OrganisationProposal(tuple(placements), collision_destinations)
+
+
+def generate_content_verified_organisation_proposal(
     scan_result: ScanResult,
     progress_callback: ProgressCallback | None = None,
     *,
     digest_cache: SqliteDigestCache | None = None,
 ) -> OrganisationProposal:
-    """Build and classify a deterministic, read-only organisation plan."""
-    proposed = []
-    ordered_entries = sorted(
-        scan_result.media_entries, key=lambda item: item.path.as_posix()
-    )
-    for entry in ordered_entries:
-        creation_date = resolve_media_creation_date(entry)
-        proposed.append(
-            (entry, creation_date, _destination_for(entry, creation_date))
-        )
+    """Build a proposal with read-only SHA-256 collision classification."""
+    proposed, groups, collision_destinations = _prepare_proposal(scan_result)
 
-    groups = defaultdict(list)
-    for item in proposed:
-        groups[item[2]].append(item)
-    collision_destinations = tuple(
-        sorted(
-            (destination for destination, items in groups.items() if len(items) > 1),
-            key=Path.as_posix,
-        )
-    )
     total_candidates = sum(
         len(groups[destination]) - 1 for destination in collision_destinations
     )
@@ -203,6 +222,35 @@ def generate_organisation_proposal(
         )
 
     return OrganisationProposal(tuple(placements), collision_destinations)
+
+
+def _prepare_proposal(
+    scan_result: ScanResult,
+) -> tuple[
+    list[ProposedItem],
+    dict[Path, list[ProposedItem]],
+    tuple[Path, ...],
+]:
+    proposed = []
+    ordered_entries = sorted(
+        scan_result.media_entries, key=lambda item: item.path.as_posix()
+    )
+    for entry in ordered_entries:
+        creation_date = resolve_media_creation_date(entry)
+        proposed.append(
+            (entry, creation_date, _destination_for(entry, creation_date))
+        )
+
+    groups = defaultdict(list)
+    for item in proposed:
+        groups[item[2]].append(item)
+    collision_destinations = tuple(
+        sorted(
+            (destination for destination, items in groups.items() if len(items) > 1),
+            key=Path.as_posix,
+        )
+    )
+    return proposed, dict(groups), collision_destinations
 
 
 def _classify_against_canonical(
@@ -317,6 +365,13 @@ def _review_destination(
         f"{normal_destination.stem}__{marker}{number}{normal_destination.suffix}"
     )
     return normal_destination.parent / folder / review_filename
+
+
+def _name_conflict_destination(normal_destination: Path, number: int) -> Path:
+    filename = (
+        f"{normal_destination.stem}__conflict{number}{normal_destination.suffix}"
+    )
+    return normal_destination.parent / "nameConflicts" / filename
 
 
 def _placement(

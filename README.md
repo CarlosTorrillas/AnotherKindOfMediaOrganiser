@@ -26,12 +26,10 @@ pytest
 behave
 ```
 
-Proposal generation caches completed SHA-256 results between runs. The SQLite
-cache is stored outside the media collection in
-`~/Library/Caches/AnotherKindOfMediaOrganiser/` on macOS, or in
-`${XDG_CACHE_HOME:-~/.cache}/another-kind-of-media-organiser/` on Linux.
-Cached results are reused only while the absolute path, file size, and
-nanosecond modification time still match.
+The `propose` command is lightweight and read-only: it calculates destinations
+and reports naming conflicts without reading or hashing media content. Explicit
+content-verification capabilities and their persistent SHA-256 cache are kept
+separate from this default proposal workflow.
 
 The initial supported extensions are `.jpg`, `.jpeg`, `.png`, `.heic`, `.arw`, `.cr2`, `.nef`, `.mp4`, `.mov`, and `.m4v`, matched case-insensitively. Other files are reported as unsupported rather than silently ignored.
 

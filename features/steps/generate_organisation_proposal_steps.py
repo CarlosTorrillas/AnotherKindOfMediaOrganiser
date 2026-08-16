@@ -88,8 +88,19 @@ def step_result_with_unsupported_files(context) -> None:
     )
 
 
-@given("two different Media Entries that produce the same proposed destination")
-def step_colliding_entries(context) -> None:
+@given("multiple Media Entries compete for the same normal proposed destination")
+def step_multiple_colliding_entries(context) -> None:
+    context.scan_result = _scan_result(
+        (
+            _entry("camera-c/IMG_001.jpg", MediaCategory.IMAGE, "2024-08-01"),
+            _entry("camera-a/IMG_001.jpg", MediaCategory.IMAGE, "2024-08-20"),
+            _entry("camera-b/IMG_001.jpg", MediaCategory.IMAGE, "2024-08-10"),
+        )
+    )
+
+
+@given("a proposed destination collision whose file content cannot be read")
+def step_unreadable_colliding_entries(context) -> None:
     context.scan_result = _scan_result(
         (
             _entry("camera-a/IMG_001.jpg", MediaCategory.IMAGE, "2024-08-01"),
@@ -157,17 +168,32 @@ def step_only_recognised_media_is_proposed(context) -> None:
     assert len(context.proposal.placements) == context.scan_result.media_files == 1
 
 
-@then("both Media Entries remain in the Organisation Proposal")
-def step_both_colliding_entries_remain(context) -> None:
-    assert len(context.proposal.placements) == 2
-
-
-@then("the destination collision is reported")
-def step_collision_reported(context) -> None:
-    assert context.proposal.collision_destinations == (
-        Path("2024/08-August/IMAGE/IMG_001.jpg"),
+@then("one receives the deterministic canonical destination")
+def step_deterministic_canonical_destination(context) -> None:
+    assert context.proposal.placements[0].source.path == Path(
+        "camera-a/IMG_001.jpg"
     )
-    assert all(placement.has_collision for placement in context.proposal.placements)
+    assert context.proposal.placements[0].destination == Path(
+        "2024/08-August/IMAGE/IMG_001.jpg"
+    )
+
+
+@then(
+    "every remaining entry receives a unique deterministic nameConflicts destination"
+)
+def step_deterministic_name_conflict_destinations(context) -> None:
+    assert [
+        placement.destination for placement in context.proposal.placements[1:]
+    ] == [
+        Path("2024/08-August/IMAGE/nameConflicts/IMG_001__conflict1.jpg"),
+        Path("2024/08-August/IMAGE/nameConflicts/IMG_001__conflict2.jpg"),
+    ]
+
+
+@then("the Name Conflict is reported without reading file content")
+def step_name_conflict_without_content(context) -> None:
+    assert len(context.proposal.placements) == 2
+    assert context.proposal.placements[1].destination.parent.name == "nameConflicts"
 
 
 @then("the Media Collection remains unchanged")
@@ -181,4 +207,3 @@ def step_collection_unchanged(context) -> None:
     }
     assert paths_after == context.paths_before
     assert state_after == context.state_before
-

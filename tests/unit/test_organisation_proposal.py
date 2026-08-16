@@ -2,6 +2,9 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+from another_kind_of_media_organiser.application import (
+    generate_organisation_proposal as proposal_module,
+)
 from another_kind_of_media_organiser.application.generate_organisation_proposal import (
     generate_organisation_proposal,
     resolve_media_creation_date,
@@ -68,7 +71,7 @@ def test_excludes_unsupported_files_from_proposal() -> None:
     assert proposal.placements[0].source == media
 
 
-def test_reports_collisions_without_discarding_entries(tmp_path: Path) -> None:
+def test_routes_name_conflicts_without_discarding_entries(tmp_path: Path) -> None:
     date = datetime(2024, 8, 1, tzinfo=timezone.utc)
     first_path = tmp_path / "camera-a/IMG_001.jpg"
     second_path = tmp_path / "camera-b/IMG_001.jpg"
@@ -85,14 +88,49 @@ def test_reports_collisions_without_discarding_entries(tmp_path: Path) -> None:
     assert tuple(placement.source for placement in proposal.placements) == (first, second)
     assert tuple(placement.destination for placement in proposal.placements) == (
         expected_destination,
-        Path("2024/08-August/IMAGE/exactDuplicates/IMG_001__dup1.jpg"),
+        Path("2024/08-August/IMAGE/nameConflicts/IMG_001__conflict1.jpg"),
     )
     assert proposal.collision_destinations == (expected_destination,)
     assert all(placement.has_collision for placement in proposal.placements)
     assert tuple(placement.classification for placement in proposal.placements) == (
         PlacementClassification.CANONICAL,
-        PlacementClassification.EXACT_DUPLICATE,
+        PlacementClassification.NAME_CONFLICT,
     )
+
+
+def test_multiple_name_conflicts_have_deterministic_unique_destinations() -> None:
+    date = datetime(2024, 8, 1, tzinfo=timezone.utc)
+    entries = tuple(
+        entry(f"{source}/IMG_001.jpg", MediaCategory.IMAGE, date)
+        for source in ("camera-c", "camera-a", "camera-b")
+    )
+
+    proposal = generate_organisation_proposal(scan_result(entries))
+
+    assert [placement.destination for placement in proposal.placements] == [
+        Path("2024/08-August/IMAGE/IMG_001.jpg"),
+        Path("2024/08-August/IMAGE/nameConflicts/IMG_001__conflict1.jpg"),
+        Path("2024/08-August/IMAGE/nameConflicts/IMG_001__conflict2.jpg"),
+    ]
+
+
+def test_name_conflicts_do_not_hash_file_content(monkeypatch) -> None:
+    date = datetime(2024, 8, 1, tzinfo=timezone.utc)
+    entries = (
+        entry("camera-a/IMG_001.jpg", MediaCategory.IMAGE, date),
+        entry("camera-b/IMG_001.jpg", MediaCategory.IMAGE, date),
+    )
+
+    def unexpected_hash(*_args, **_kwargs):
+        raise AssertionError("lightweight proposal must not hash file content")
+
+    monkeypatch.setattr(
+        proposal_module.file_content, "sha256_digest", unexpected_hash
+    )
+
+    proposal = generate_organisation_proposal(scan_result(entries))
+
+    assert proposal.name_conflict_files == 1
 
 
 def test_proposal_is_deterministic_for_the_same_entries_in_any_input_order() -> None:

@@ -8,7 +8,7 @@ from another_kind_of_media_organiser.application import (
     generate_organisation_proposal as proposal_module,
 )
 from another_kind_of_media_organiser.application.generate_organisation_proposal import (
-    generate_organisation_proposal,
+    generate_content_verified_organisation_proposal,
 )
 from another_kind_of_media_organiser.application.scan_media_collection import (
     scan_media_collection,
@@ -43,7 +43,9 @@ def test_cache_miss_hashes_and_second_run_reuses_persisted_digests(
 
     monkeypatch.setattr(proposal_module.file_content, "sha256_digest", recording_digest)
     with SqliteDigestCache(database) as cache:
-        first = generate_organisation_proposal(scan_result, digest_cache=cache)
+        first = generate_content_verified_organisation_proposal(
+            scan_result, digest_cache=cache
+        )
 
     assert first.exact_duplicate_files == 1
     assert len(hash_calls) == 2
@@ -52,7 +54,7 @@ def test_cache_miss_hashes_and_second_run_reuses_persisted_digests(
     hash_calls.clear()
     progress = []
     with SqliteDigestCache(database) as cache:
-        second = generate_organisation_proposal(
+        second = generate_content_verified_organisation_proposal(
             scan_result, progress.append, digest_cache=cache
         )
 
@@ -71,7 +73,9 @@ def test_changed_size_or_mtime_invalidates_cached_digest(
     changed_path = collection / "source-1" / "IMG_001.jpg"
     database = tmp_path / "cache.sqlite3"
     with SqliteDigestCache(database) as cache:
-        generate_organisation_proposal(scan_result, digest_cache=cache)
+        generate_content_verified_organisation_proposal(
+            scan_result, digest_cache=cache
+        )
 
     if change == "size":
         for path in collection.glob("*/IMG_001.jpg"):
@@ -89,7 +93,9 @@ def test_changed_size_or_mtime_invalidates_cached_digest(
 
     monkeypatch.setattr(proposal_module.file_content, "sha256_digest", recording_digest)
     with SqliteDigestCache(database) as cache:
-        generate_organisation_proposal(refreshed_scan, digest_cache=cache)
+        generate_content_verified_organisation_proposal(
+            refreshed_scan, digest_cache=cache
+        )
 
     if change == "size":
         assert len(hash_calls) == 2
@@ -110,7 +116,7 @@ def test_interrupted_run_preserves_completed_file_hashes(
 
     with pytest.raises(KeyboardInterrupt):
         with SqliteDigestCache(database) as cache:
-            generate_organisation_proposal(
+            generate_content_verified_organisation_proposal(
                 scan_result, interrupt_after_first_candidate, digest_cache=cache
             )
 
@@ -124,7 +130,7 @@ def test_interrupted_run_preserves_completed_file_hashes(
     monkeypatch.setattr(proposal_module.file_content, "sha256_digest", recording_digest)
     progress = []
     with SqliteDigestCache(database) as cache:
-        proposal = generate_organisation_proposal(
+        proposal = generate_content_verified_organisation_proposal(
             scan_result, progress.append, digest_cache=cache
         )
 
