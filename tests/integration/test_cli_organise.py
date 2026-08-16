@@ -1,4 +1,8 @@
+import os
+from datetime import datetime, timezone
 from pathlib import Path
+
+import pytest
 
 from another_kind_of_media_organiser import cli
 from another_kind_of_media_organiser.application.generate_organisation_proposal import (
@@ -8,6 +12,22 @@ from another_kind_of_media_organiser.application.scan_media_collection import (
     scan_media_collection,
 )
 from another_kind_of_media_organiser.cli import main
+
+
+@pytest.fixture(autouse=True)
+def deterministic_available_capacity(monkeypatch) -> None:
+    monkeypatch.setattr(
+        cli,
+        "available_capacity",
+        lambda _path: cli.DEFAULT_SAFETY_RESERVE_BYTES + 1024**4,
+    )
+
+
+def _dated_file(path: Path, content: bytes, year: int, month: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+    timestamp = datetime(year, month, 1, tzinfo=timezone.utc).timestamp()
+    os.utime(path, (timestamp, timestamp))
 
 
 def test_declining_confirmation_creates_nothing(
@@ -184,3 +204,83 @@ def test_declining_move_confirmation_changes_nothing(
     assert media.read_bytes() == b"valuable"
     assert not destination.exists()
     assert "cancelled before moving" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("move", [False, True])
+def test_accepted_partial_execution_only_processes_selected_oldest_month(
+    tmp_path: Path, capsys, monkeypatch, move: bool
+) -> None:
+    source = tmp_path / "source"
+    january = source / "january.jpg"
+    february = source / "february.jpg"
+    _dated_file(january, b"jan", 2024, 1)
+    _dated_file(february, b"february", 2024, 2)
+    destination = tmp_path / "destination"
+    monkeypatch.setattr(
+        cli,
+        "available_capacity",
+        lambda _path: cli.DEFAULT_SAFETY_RESERVE_BYTES + 3,
+    )
+    monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
+    arguments = ["organise", str(source), "--destination", str(destination)]
+    if move:
+        arguments.append("--move")
+
+    assert main(arguments) == 0
+
+    captured = capsys.readouterr()
+    destinations = [path for path in destination.rglob("*") if path.is_file()]
+    assert len(destinations) == 1
+    assert destinations[0].read_bytes() == b"jan"
+    assert "Partial organisation completed." in captured.out
+    assert "Organised:\n  2024 January" in captured.out
+    assert "2024/02" in captured.out
+    assert february.read_bytes() == b"february"
+    assert january.exists() is (not move)
+
+
+def test_declining_partial_proposal_produces_zero_writes(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    source = tmp_path / "source"
+    _dated_file(source / "jan.jpg", b"jan", 2024, 1)
+    _dated_file(source / "feb.jpg", b"february", 2024, 2)
+    destination = tmp_path / "destination"
+    monkeypatch.setattr(
+        cli,
+        "available_capacity",
+        lambda _path: cli.DEFAULT_SAFETY_RESERVE_BYTES + 3,
+    )
+    monkeypatch.setattr("builtins.input", lambda _prompt: "")
+
+    assert main(["organise", str(source), "--destination", str(destination)]) == 0
+
+    assert not destination.exists()
+    assert len(tuple(source.glob("*.jpg"))) == 2
+    assert "Continue with this partial organisation? [y/N]" in capsys.readouterr().out
+
+
+def test_no_month_fits_and_capacity_query_failure_write_nothing(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    source = tmp_path / "source"
+    _dated_file(source / "jan.jpg", b"large", 2024, 1)
+    destination = tmp_path / "destination"
+    monkeypatch.setattr(
+        cli,
+        "available_capacity",
+        lambda _path: cli.DEFAULT_SAFETY_RESERVE_BYTES + 4,
+    )
+
+    assert main(["organise", str(source), "--destination", str(destination)]) == 2
+    assert not destination.exists()
+    assert "No complete Year/Month group fits" in capsys.readouterr().err
+
+    monkeypatch.setattr(
+        cli,
+        "available_capacity",
+        lambda _path: (_ for _ in ()).throw(OSError("capacity unavailable")),
+    )
+    assert main(["organise", str(source), "--destination", str(destination)]) == 2
+    assert not destination.exists()
+    assert "capacity unavailable" in capsys.readouterr().err
