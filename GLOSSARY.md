@@ -12,11 +12,15 @@ A separate root directory that receives organised copies during Organisation Exe
 
 ## Scan
 
-A read-only inspection of a Media Collection. A Scan gathers information about the collection and must not modify it.
+A read-only inspection of a Media Collection. A Scan gathers information about the collection and must not modify it. A Scan is complete only when every path needed for traversal and media discovery could be inspected.
+
+## Incomplete Scan
+
+A Scan that encountered one or more inaccessible filesystem paths. Its Scan Result contains only information that could be inspected safely and records the inaccessible paths and reported reasons. An incomplete Scan may inform a partial Organisation Proposal or Collision Verification, but it must never be used for Organisation Execution.
 
 ## Scan Result
 
-The information produced by a Scan. It currently summarises the total files encountered, recognised media, unsupported files, directories scanned, media counts by category, discovered File Extensions, and discovered Media Entries.
+The information produced by a Scan. It currently summarises the total files encountered, recognised media, unsupported files, directories scanned, media counts by category, discovered File Extensions, discovered Media Entries, whether the Scan is complete, and any inaccessible paths.
 
 ## Media Entry
 

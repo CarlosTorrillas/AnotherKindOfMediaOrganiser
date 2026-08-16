@@ -48,6 +48,12 @@ existing planned destination before the first copy. Completed files are kept if
 a later runtime failure occurs; incomplete copies use distinguishable temporary
 files and are cleaned up on a best-effort basis.
 
+Every scan reports `Scan complete: YES` or `Scan complete: NO`. Inaccessible
+filesystem paths are counted and sampled rather than silently ignored.
+`propose` and `verify-collisions` warn when their results cover only accessible
+media. `organise` refuses an incomplete source scan before creating or copying
+anything; there is no override.
+
 The initial supported extensions are `.jpg`, `.jpeg`, `.png`, `.heic`, `.arw`, `.cr2`, `.nef`, `.mp4`, `.mov`, and `.m4v`, matched case-insensitively. Other files are reported as unsupported rather than silently ignored.
 
 ## Architecture

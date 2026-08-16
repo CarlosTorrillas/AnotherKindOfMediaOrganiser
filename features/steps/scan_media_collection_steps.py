@@ -10,6 +10,7 @@ from another_kind_of_media_organiser.application.scan_media_collection import (
 )
 from another_kind_of_media_organiser.cli import main
 from another_kind_of_media_organiser.domain.media import MediaCategory
+from another_kind_of_media_organiser.infrastructure import filesystem_scanner
 
 
 def _make_directory(context) -> Path:
@@ -57,6 +58,22 @@ def step_mixed_case_extensions(context) -> None:
 @given("an empty directory")
 def step_empty_directory(context) -> None:
     _make_directory(context)
+
+
+@given("filesystem traversal reports an inaccessible directory")
+def step_inaccessible_directory(context) -> None:
+    root = _make_directory(context)
+    context.inaccessible_path = root / "private"
+    original_walk = filesystem_scanner.os.walk
+
+    def walk_with_error(walk_root, *, followlinks, onerror):
+        onerror(
+            PermissionError(13, "Permission denied", context.inaccessible_path)
+        )
+        yield str(walk_root), [], []
+
+    filesystem_scanner.os.walk = walk_with_error
+    context.add_cleanup(lambda: setattr(filesystem_scanner.os, "walk", original_walk))
 
 
 @given("a directory containing a symbolic link to an external directory")
@@ -169,6 +186,22 @@ def step_single_media_file(context, count: int) -> None:
 @then("the scan reports {count:d} unsupported files")
 def step_unsupported_files(context, count: int) -> None:
     assert context.result.unsupported_files == count
+
+
+@then("the scan is complete")
+def step_scan_complete(context) -> None:
+    assert context.result.is_complete
+
+
+@then("the scan is incomplete")
+def step_scan_incomplete(context) -> None:
+    assert not context.result.is_complete
+
+
+@then("the inaccessible path and reason are reported")
+def step_inaccessible_reported(context) -> None:
+    assert context.result.inaccessible_paths[0].path == context.inaccessible_path
+    assert context.result.inaccessible_paths[0].reason == "Permission denied"
 
 
 @then("the scan reports {count:d} directories scanned")

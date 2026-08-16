@@ -38,6 +38,13 @@ Feature: Scan a media collection safely
     Then the scan reports 0 total files
     And the scan reports 0 recognised media files
     And the scan reports 0 unsupported files
+    And the scan is complete
+
+  Scenario: Report an inaccessible directory
+    Given filesystem traversal reports an inaccessible directory
+    When the user scans the directory
+    Then the scan is incomplete
+    And the inaccessible path and reason are reported
 
   Scenario: Do not follow directory symbolic links
     Given a directory containing a symbolic link to an external directory
