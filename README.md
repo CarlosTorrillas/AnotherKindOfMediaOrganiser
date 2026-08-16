@@ -51,6 +51,8 @@ files and are cleaned up on a best-effort basis.
 Before COPY or MOVE confirmation, Capacity Preflight reports required space,
 available space, and a fixed 1 GiB safety reserve. When the complete proposal
 does not fit, it can offer the oldest complete Year/Month prefix that fits.
+Planning stops at the first Year/Month that does not fit and never skips ahead
+to a later month, even when that later month would fit the remaining capacity.
 Declining that partial proposal writes nothing, and included placements always
 retain their original proposed destinations.
 

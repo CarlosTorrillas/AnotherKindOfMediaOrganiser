@@ -75,7 +75,7 @@ A read-only check performed before Organisation Execution that compares the requ
 
 ## Partial Organisation Proposal
 
-A subset of an Organisation Proposal containing complete chronological Year/Month groups selected because of destination capacity constraints. Every included Proposed Placement retains exactly its original destination; excluded Media Entries remain untouched.
+A subset of an Organisation Proposal containing a continuous oldest-first prefix of complete chronological Year/Month groups selected because of destination capacity constraints. Selection stops at the first Year/Month group that does not fit and never skips ahead to include a later month, even if that later month would fit. Every included Proposed Placement retains exactly its original destination; excluded Media Entries remain untouched.
 
 ## COPY Organisation Execution
 

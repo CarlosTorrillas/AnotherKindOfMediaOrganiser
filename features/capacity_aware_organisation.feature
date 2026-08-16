@@ -13,6 +13,7 @@ Feature: Plan Organisation Execution within destination capacity
     When Capacity Preflight is performed
     Then January and February are selected in chronological order
     And March is excluded completely
+    And planning does not skip ahead to a later month
     And every included placement keeps its original destination
 
   Scenario: Keep Name Conflicts in their complete month
@@ -29,4 +30,3 @@ Feature: Plan Organisation Execution within destination capacity
     Given Capacity Preflight offers a partial Organisation Proposal
     When the user declines partial Organisation Execution
     Then no destination content is written
-

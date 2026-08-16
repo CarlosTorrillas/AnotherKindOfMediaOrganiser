@@ -47,6 +47,7 @@ def test_partial_proposal_is_oldest_complete_month_prefix(tmp_path: Path) -> Non
         tmp_path,
         [
             ("newest.jpg", b"33333", date(2024, 3)),
+            ("later-small.jpg", b"x", date(2024, 4)),
             ("oldest.jpg", b"111", date(2023, 12)),
             ("middle.jpg", b"2222", date(2024, 1)),
         ],
@@ -56,7 +57,7 @@ def test_partial_proposal_is_oldest_complete_month_prefix(tmp_path: Path) -> Non
 
     assert result.is_partial
     assert result.included_months == ((2023, 12), (2024, 1))
-    assert result.excluded_months == ((2024, 3),)
+    assert result.excluded_months == ((2024, 3), (2024, 4))
     assert result.execution_required_bytes == 7
     selected = result.execution_proposal
     assert selected is not None

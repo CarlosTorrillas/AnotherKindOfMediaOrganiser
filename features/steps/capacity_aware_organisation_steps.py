@@ -46,7 +46,12 @@ def given_full_fits(context) -> None:
 def given_partial(context) -> None:
     _proposal(
         context,
-        [("march.jpg", b"33333", 3), ("jan.jpg", b"111", 1), ("feb.jpg", b"2222", 2)],
+        [
+            ("march.jpg", b"33333", 3),
+            ("april.jpg", b"4", 4),
+            ("jan.jpg", b"111", 1),
+            ("feb.jpg", b"2222", 2),
+        ],
     )
     context.available = 7
 
@@ -94,7 +99,12 @@ def then_prefix(context) -> None:
 
 @then("March is excluded completely")
 def then_march_excluded(context) -> None:
-    assert context.capacity.excluded_months == ((2024, 3),)
+    assert (2024, 3) in context.capacity.excluded_months
+
+
+@then("planning does not skip ahead to a later month")
+def then_no_skip_ahead(context) -> None:
+    assert context.capacity.excluded_months == ((2024, 3), (2024, 4))
 
 
 @then("every included placement keeps its original destination")
