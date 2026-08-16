@@ -142,3 +142,45 @@ def test_runtime_failure_reports_partial_destination_state(
     assert "Files copied: 0 / 1" in captured.err
     assert "Destination may contain successfully completed copies." in captured.err
     assert media.read_bytes() == b"source"
+
+
+def test_move_requires_explicit_confirmation_then_removes_verified_source(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    media = source / "photo.jpg"
+    media.write_bytes(b"valuable")
+    destination = tmp_path / "destination"
+    monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
+
+    assert main(
+        ["organise", str(source), "--destination", str(destination), "--move"]
+    ) == 0
+
+    captured = capsys.readouterr()
+    copied = next(path for path in destination.rglob("*.jpg"))
+    assert copied.read_bytes() == b"valuable"
+    assert not media.exists()
+    assert "Operation: MOVE" in captured.out
+    assert "THIS OPERATION WILL DELETE SOURCE FILES." in captured.out
+    assert "Source files deleted: 1" in captured.out
+
+
+def test_declining_move_confirmation_changes_nothing(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    media = source / "photo.jpg"
+    media.write_bytes(b"valuable")
+    destination = tmp_path / "destination"
+    monkeypatch.setattr("builtins.input", lambda _prompt: "no")
+
+    assert main(
+        ["organise", str(source), "--destination", str(destination), "--move"]
+    ) == 0
+
+    assert media.read_bytes() == b"valuable"
+    assert not destination.exists()
+    assert "cancelled before moving" in capsys.readouterr().out

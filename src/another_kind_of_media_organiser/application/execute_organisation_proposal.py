@@ -2,10 +2,20 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 
 from another_kind_of_media_organiser.domain.organisation import OrganisationProposal
 from another_kind_of_media_organiser.infrastructure.atomic_copy import copy_file
+from another_kind_of_media_organiser.infrastructure.file_content import (
+    delete_file,
+    verify_identical,
+)
+
+
+class OrganisationExecutionMode(Enum):
+    COPY = "copy"
+    MOVE = "move"
 
 
 @dataclass(frozen=True)
@@ -28,6 +38,8 @@ class OrganisationExecutionProgress:
     files_copied: int
     total_files: int
     bytes_copied: int
+    files_verified: int = 0
+    source_files_deleted: int = 0
 
 
 @dataclass(frozen=True)
@@ -35,6 +47,8 @@ class OrganisationExecutionResult:
     files_copied: int
     total_files: int
     bytes_copied: int
+    files_verified: int = 0
+    source_files_deleted: int = 0
 
 
 class UnsafeDestinationError(ValueError):
@@ -64,8 +78,20 @@ class OrganisationCopyError(OSError):
         self.cause = cause
 
 
+class OrganisationVerificationError(OrganisationCopyError):
+    pass
+
+
+class OrganisationDeletionError(OrganisationCopyError):
+    def __init__(self, *args, files_verified: int, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.files_verified = files_verified
+
+
 ProgressCallback = Callable[[OrganisationExecutionProgress], None]
 CopyFile = Callable[[Path, Path, Callable[[int], None]], None]
+VerifyFile = Callable[[Path, Path], None]
+DeleteFile = Callable[[Path], None]
 
 
 def prepare_organisation_execution(
@@ -133,17 +159,26 @@ def execute_organisation_plan(
     plan: OrganisationExecutionPlan,
     progress_callback: ProgressCallback | None = None,
     *,
+    mode: OrganisationExecutionMode = OrganisationExecutionMode.COPY,
     copy_file: CopyFile = copy_file,
+    verify_file: VerifyFile = verify_identical,
+    delete_file: DeleteFile = delete_file,
 ) -> OrganisationExecutionResult:
-    """Copy every prevalidated placement, stopping at the first failure."""
+    """Execute each placement, optionally verifying before deleting its source."""
     files_copied = 0
     bytes_copied = 0
+    files_verified = 0
+    source_files_deleted = 0
 
     def report() -> None:
         if progress_callback is not None:
             progress_callback(
                 OrganisationExecutionProgress(
-                    files_copied, len(plan.items), bytes_copied
+                    files_copied,
+                    len(plan.items),
+                    bytes_copied,
+                    files_verified,
+                    source_files_deleted,
                 )
             )
 
@@ -168,9 +203,43 @@ def execute_organisation_plan(
             ) from error
         files_copied += 1
         report()
+        if mode is OrganisationExecutionMode.MOVE:
+            try:
+                verify_file(item.source, item.destination)
+            except KeyboardInterrupt:
+                raise
+            except Exception as error:
+                raise OrganisationVerificationError(
+                    item.source,
+                    item.destination,
+                    files_copied,
+                    len(plan.items),
+                    error,
+                ) from error
+            files_verified += 1
+            report()
+            try:
+                delete_file(item.source)
+            except KeyboardInterrupt:
+                raise
+            except Exception as error:
+                raise OrganisationDeletionError(
+                    item.source,
+                    item.destination,
+                    files_copied,
+                    len(plan.items),
+                    error,
+                    files_verified=files_verified,
+                ) from error
+            source_files_deleted += 1
+            report()
 
     return OrganisationExecutionResult(
-        files_copied, len(plan.items), bytes_copied
+        files_copied,
+        len(plan.items),
+        bytes_copied,
+        files_verified,
+        source_files_deleted,
     )
 
 

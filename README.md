@@ -24,6 +24,7 @@ media-organiser scan /path/to/media
 media-organiser propose /path/to/media
 media-organiser verify-collisions /path/to/media
 media-organiser organise /path/to/media --destination /separate/organised-media
+media-organiser organise /path/to/media --destination /separate/organised-media --move
 pytest
 behave
 ```
@@ -42,8 +43,7 @@ review directories.
 
 The `organise` command is the only writing workflow. It displays the complete
 lightweight execution summary and defaults confirmation to No before copying to
-a separate destination. Source media is never moved, deleted, renamed, or
-modified. Preflight rejects unsafe source/destination relationships and every
+a separate destination. Preflight rejects unsafe source/destination relationships and every
 existing planned destination before the first copy. Completed files are kept if
 a later runtime failure occurs; incomplete copies use distinguishable temporary
 files and are cleaned up on a best-effort basis.
@@ -51,7 +51,10 @@ files and are cleaned up on a best-effort basis.
 Every scan reports `Scan complete: YES` or `Scan complete: NO`. Inaccessible
 filesystem paths are counted and sampled rather than silently ignored.
 `propose` and `verify-collisions` warn when their results cover only accessible
-media. `organise` refuses an incomplete source scan before creating or copying
+media. COPY remains the default. Explicit `--move` copies each file, verifies the
+source and destination sizes and SHA-256 content, and only then deletes that source.
+It does not use cached hashes as evidence for deletion. `organise` refuses an
+incomplete source scan before creating or copying
 anything; there is no override.
 
 The initial supported extensions are `.jpg`, `.jpeg`, `.png`, `.heic`, `.arw`, `.cr2`, `.nef`, `.mp4`, `.mov`, and `.m4v`, matched case-insensitively. Other files are reported as unsupported rather than silently ignored.
