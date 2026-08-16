@@ -7,6 +7,9 @@ import pytest
 from another_kind_of_media_organiser.application.execute_organisation_proposal import (
     DestinationConflictError,
     OrganisationCopyError,
+    OrganisationDeletionError,
+    OrganisationExecutionMode,
+    OrganisationVerificationError,
     UnsafeDestinationError,
     execute_organisation_plan,
     prepare_organisation_execution,
@@ -167,3 +170,99 @@ def test_runtime_failure_keeps_completed_copies_and_stops(
     assert plan.items[0].destination.is_file()
     assert not plan.items[1].destination.exists()
     assert all(item.source.is_file() for item in plan.items)
+
+
+def test_move_copies_verifies_then_deletes_source(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    proposal = proposal_for(source, {"photo.jpg": b"valuable"})
+    plan = prepare_organisation_execution(proposal, source, destination)
+    events: list[str] = []
+
+    def copy(source_path, destination_path, on_bytes):
+        events.append("copy")
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        destination_path.write_bytes(source_path.read_bytes())
+        on_bytes(source_path.stat().st_size)
+
+    def verify(source_path, destination_path):
+        events.append("verify")
+        assert source_path.is_file()
+        assert destination_path.read_bytes() == b"valuable"
+
+    def delete(source_path):
+        events.append("delete")
+        source_path.unlink()
+
+    result = execute_organisation_plan(
+        plan,
+        mode=OrganisationExecutionMode.MOVE,
+        copy_file=copy,
+        verify_file=verify,
+        delete_file=delete,
+    )
+
+    assert events == ["copy", "verify", "delete"]
+    assert not plan.items[0].source.exists()
+    assert plan.items[0].destination.read_bytes() == b"valuable"
+    assert result.files_verified == result.source_files_deleted == 1
+
+
+def test_move_verification_failure_never_deletes_source(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    proposal = proposal_for(source, {"photo.jpg": b"valuable"})
+    plan = prepare_organisation_execution(proposal, source, tmp_path / "destination")
+    deleted = False
+
+    def fail_verification(_source, _destination):
+        raise ValueError("digest mismatch")
+
+    def delete(_source):
+        nonlocal deleted
+        deleted = True
+
+    with pytest.raises(OrganisationVerificationError):
+        execute_organisation_plan(
+            plan,
+            mode=OrganisationExecutionMode.MOVE,
+            verify_file=fail_verification,
+            delete_file=delete,
+        )
+
+    assert plan.items[0].source.read_bytes() == b"valuable"
+    assert plan.items[0].destination.is_file()
+    assert not deleted
+
+
+def test_move_deletion_failure_reports_verified_copy_and_preserves_source(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    proposal = proposal_for(source, {"photo.jpg": b"valuable"})
+    plan = prepare_organisation_execution(proposal, source, tmp_path / "destination")
+
+    with pytest.raises(OrganisationDeletionError) as raised:
+        execute_organisation_plan(
+            plan,
+            mode=OrganisationExecutionMode.MOVE,
+            delete_file=lambda _path: (_ for _ in ()).throw(OSError("read only")),
+        )
+
+    assert raised.value.files_verified == 1
+    assert plan.items[0].source.is_file()
+    assert plan.items[0].destination.read_bytes() == b"valuable"
+
+
+def test_copy_mode_is_default_and_does_not_verify_or_delete(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    proposal = proposal_for(source, {"photo.jpg": b"valuable"})
+    plan = prepare_organisation_execution(proposal, source, tmp_path / "destination")
+
+    result = execute_organisation_plan(
+        plan,
+        verify_file=lambda *_args: (_ for _ in ()).throw(AssertionError()),
+        delete_file=lambda *_args: (_ for _ in ()).throw(AssertionError()),
+    )
+
+    assert result.files_verified == result.source_files_deleted == 0
+    assert plan.items[0].source.is_file()
