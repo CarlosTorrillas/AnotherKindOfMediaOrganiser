@@ -75,7 +75,7 @@ The explicit application of an accepted Organisation Proposal to a Destination C
 
 ## Capacity Preflight
 
-A read-only check performed before Organisation Execution that compares the requested Organisation Proposal with usable destination capacity. Usable capacity is reported free space minus the explicit safety reserve. Capacity Preflight may select the full proposal, offer a Partial Organisation Proposal, or determine that no complete Year/Month group can be executed.
+A read-only check performed before Organisation Execution that compares the requested Organisation Proposal with usable destination capacity. Each planned file's logical size is rounded independently to a conservatively determined destination filesystem allocation unit. Usable capacity is reported free space minus the separate explicit safety reserve. Directory metadata, concurrent writes, and other filesystem behaviour remain covered only by that reserve. Capacity Preflight may select the full proposal, offer a Partial Organisation Proposal, or determine that no complete Year/Month group can be executed.
 
 ## Partial Organisation Proposal
 

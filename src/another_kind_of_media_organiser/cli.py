@@ -46,6 +46,7 @@ from another_kind_of_media_organiser.infrastructure.digest_cache import (
     default_digest_cache_path,
 )
 from another_kind_of_media_organiser.infrastructure.filesystem_capacity import (
+    allocation_unit,
     available_capacity,
 )
 
@@ -477,6 +478,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
                 capacity = plan_organisation_capacity(
                     proposal,
                     available_capacity(parsed_arguments.destination),
+                    allocation_unit=allocation_unit(parsed_arguments.destination),
                 )
                 if capacity.execution_proposal is None:
                     _print_capacity_preflight(capacity)
@@ -593,6 +595,12 @@ def _confirm_and_execute(
     except OrganisationCopyError as error:
         reporter.cancel()
         print("Organisation execution failed.", file=sys.stderr)
+        reason = (
+            error.cause.strerror
+            if isinstance(error.cause, OSError) and error.cause.strerror
+            else str(error.cause)
+        )
+        print(f"Reason: {reason}", file=sys.stderr)
         print(f"Failed source: {error.source}", file=sys.stderr)
         print(f"Failed destination: {error.destination}", file=sys.stderr)
         print(
@@ -633,6 +641,8 @@ def _confirm_and_execute(
 def _print_capacity_preflight(capacity: CapacityPreflight) -> None:
     print("Organisation preflight")
     print(f"\nMedia files: {len(capacity.requested_proposal.placements)}")
+    print(f"Logical media size: {_format_bytes(capacity.logical_required_bytes)}")
+    print(f"Destination allocation unit: {_format_bytes(capacity.allocation_unit)}")
     print(f"Required space: {_format_bytes(capacity.required_bytes)}")
     print(f"Available space: {_format_bytes(capacity.available_bytes)}")
     print(f"Safety reserve: {_format_bytes(capacity.reserve_bytes)}")

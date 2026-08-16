@@ -66,8 +66,13 @@ a later runtime failure occurs; incomplete copies use distinguishable temporary
 files and are cleaned up on a best-effort basis.
 
 Before COPY or MOVE confirmation, Capacity Preflight reports required space,
-available space, and a fixed 1 GiB safety reserve. When the complete proposal
-does not fit, it can offer the oldest complete Year/Month prefix that fits.
+available space, destination allocation unit, and a fixed 1 GiB safety reserve.
+Required space rounds every planned file independently to the conservatively
+reported filesystem allocation unit instead of assuming logical bytes consume
+the same physical space. Directory metadata, concurrent filesystem activity,
+and other filesystem-specific costs remain limitations covered by the separate
+safety reserve. When the complete proposal does not fit, it can offer the
+oldest complete Year/Month prefix that fits.
 Planning stops at the first Year/Month that does not fit and never skips ahead
 to a later month, even when that later month would fit the remaining capacity.
 Declining that partial proposal writes nothing, and included placements always
@@ -81,6 +86,11 @@ source and destination sizes and SHA-256 content, and only then deletes that sou
 It does not use cached hashes as evidence for deletion. `organise` refuses an
 incomplete source scan before creating or copying
 anything; there is no override.
+
+Atomic copies preserve file content and the modification timestamp required by
+the current Media Creation Date fallback. They deliberately do not copy Finder
+metadata, unrelated extended attributes, resource forks, BSD flags, or other
+platform metadata that can create AppleDouble (`._*`) sidecars on ExFAT.
 
 The initial supported extensions are `.jpg`, `.jpeg`, `.png`, `.heic`, `.arw`, `.cr2`, `.nef`, `.mp4`, `.mov`, and `.m4v`, matched case-insensitively. Other files are reported as unsupported rather than silently ignored.
 

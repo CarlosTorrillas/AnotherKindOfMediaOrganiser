@@ -48,6 +48,7 @@ def test_copy_and_move_never_touch_excluded_media(
         "available_capacity",
         lambda _path: cli.DEFAULT_SAFETY_RESERVE_BYTES + 1024**3,
     )
+    monkeypatch.setattr(cli, "allocation_unit", lambda _path: 1)
     monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
     arguments = [
         "organise",
