@@ -19,6 +19,14 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         "VERIFICATION_COORDINATOR"
     ) or VerificationCoordinator()
 
+    from another_kind_of_media_organiser.presentation.web.copy_jobs import (
+        CopyCoordinator,
+    )
+
+    app.extensions["copy_coordinator"] = app.config.get(
+        "COPY_COORDINATOR"
+    ) or CopyCoordinator()
+
     from another_kind_of_media_organiser.presentation.web.routes import browser
 
     app.register_blueprint(browser)
