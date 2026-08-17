@@ -56,6 +56,12 @@
           </article>
         {% endfor %}
         <p>Showing {{ collisions|length }} of {{ collision_total }} collisions</p>
+        <form method="post" action="{{ url_for('browser.start_verification') }}" data-submission-form>
+          <input type="hidden" name="source" value="{{ source }}">
+          {% for exclusion in exclusions %}<input type="hidden" name="exclude" value="{{ exclusion }}">{% endfor %}
+          <button type="submit">Verify Collisions</button>
+          <p class="working" role="status" aria-live="polite" hidden data-working>Starting deep collision verification…</p>
+        </form>
       {% endif %}
     </section>
   {% else %}

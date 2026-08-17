@@ -179,3 +179,16 @@ def test_cancelling_verification_signals_the_existing_job() -> None:
 
     assert response.status_code == 303
     assert coordinator.cancellations == ["job-123"]
+
+
+def test_unsafe_verification_exclusion_is_rejected_before_job_creation() -> None:
+    client, coordinator = _client(_job())
+
+    response = client.post(
+        "/verifications",
+        data={"source": "/collection", "exclude": "../outside"},
+    )
+
+    assert response.status_code == 400
+    assert coordinator.submissions == []
+    assert b"must remain inside the Media Collection" in response.data
