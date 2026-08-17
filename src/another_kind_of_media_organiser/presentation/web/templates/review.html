@@ -55,7 +55,7 @@
             <ul>{% for placement in placements %}<li><strong>{{ placement.classification.value|replace('_', ' ')|title }}:</strong> {{ placement.source.path }}</li>{% endfor %}</ul>
           </article>
         {% endfor %}
-        <p>Showing {{ collisions|length }} of {{ proposal.collision_destinations|length }} collisions.</p>
+        <p>Showing {{ collisions|length }} of {{ collision_total }} collisions</p>
       {% endif %}
     </section>
   {% else %}

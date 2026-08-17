@@ -16,7 +16,8 @@ from another_kind_of_media_organiser.domain.organisation import OrganisationProp
 
 
 browser = Blueprint("browser", __name__)
-_MAX_EXAMPLES = 10
+_MAX_PATH_EXAMPLES = 10
+_MAX_COLLISION_EXAMPLES = 5
 
 
 @browser.get("/")
@@ -157,7 +158,9 @@ def _render_review(
                     )
                 ),
             )
-            for destination in proposal.collision_destinations[:_MAX_EXAMPLES]
+            for destination in proposal.collision_destinations[
+                :_MAX_COLLISION_EXAMPLES
+            ]
         )
         if proposal
         else ()
@@ -168,11 +171,14 @@ def _render_review(
         exclusions=exclusions,
         result=result,
         inaccessible=inaccessible,
-        inaccessible_examples=inaccessible[:_MAX_EXAMPLES],
+        inaccessible_examples=inaccessible[:_MAX_PATH_EXAMPLES],
         excluded=excluded,
-        excluded_examples=excluded[:_MAX_EXAMPLES],
+        excluded_examples=excluded[:_MAX_PATH_EXAMPLES],
         proposal=proposal,
         year_counts=year_counts,
         collisions=collisions,
+        collision_total=(
+            f"{len(proposal.collision_destinations):,}" if proposal else "0"
+        ),
         MediaCategory=MediaCategory,
     )
