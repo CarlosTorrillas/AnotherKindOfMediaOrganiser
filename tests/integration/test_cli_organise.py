@@ -1,4 +1,5 @@
 import os
+import errno
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -21,6 +22,7 @@ def deterministic_available_capacity(monkeypatch) -> None:
         "available_capacity",
         lambda _path: cli.DEFAULT_SAFETY_RESERVE_BYTES + 1024**4,
     )
+    monkeypatch.setattr(cli, "allocation_unit", lambda _path: 1)
 
 
 def _dated_file(path: Path, content: bytes, year: int, month: int) -> None:
@@ -162,6 +164,39 @@ def test_runtime_failure_reports_partial_destination_state(
     assert "Files copied: 0 / 1" in captured.err
     assert "Destination may contain successfully completed copies." in captured.err
     assert media.read_bytes() == b"source"
+
+
+def test_enospc_reports_original_reason_and_preserves_move_source(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    media = source / "photo.jpg"
+    media.write_bytes(b"valuable")
+    destination = tmp_path / "destination"
+    monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
+
+    def failed_execution(plan, _progress, **_kwargs):
+        item = plan.items[0]
+        raise cli.OrganisationCopyError(
+            item.source,
+            item.destination,
+            0,
+            len(plan.items),
+            OSError(errno.ENOSPC, "No space left on device"),
+        )
+
+    monkeypatch.setattr(cli, "execute_organisation_plan", failed_execution)
+
+    assert main(
+        ["organise", str(source), "--destination", str(destination), "--move"]
+    ) == 1
+
+    error = capsys.readouterr().err
+    assert "Organisation execution failed." in error
+    assert "Reason: No space left on device" in error
+    assert "The failed source file was not deleted." in error
+    assert media.read_bytes() == b"valuable"
 
 
 def test_move_requires_explicit_confirmation_then_removes_verified_source(

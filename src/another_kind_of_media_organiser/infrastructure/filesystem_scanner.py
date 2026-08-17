@@ -16,7 +16,11 @@ from another_kind_of_media_organiser.domain.media import (
 )
 
 
-def scan_directory(root: Path) -> ScanResult:
+def scan_directory(
+    root: Path,
+    *,
+    excluded_paths: frozenset[Path] = frozenset(),
+) -> ScanResult:
     """Recursively inspect a directory without following symbolic links."""
     if not root.is_dir():
         raise NotADirectoryError(root)
@@ -29,6 +33,7 @@ def scan_directory(root: Path) -> ScanResult:
     unsupported_files = 0
     directories_scanned = 0
     inaccessible_paths: dict[Path, InaccessiblePath] = {}
+    encountered_exclusions: set[Path] = set()
 
     def record_inaccessible(error: OSError, path: Path | None = None) -> None:
         inaccessible_path = path or Path(error.filename or root)
@@ -44,13 +49,21 @@ def scan_directory(root: Path) -> ScanResult:
         onerror=record_inaccessible,
     ):
         directory_path = Path(directory)
-        child_directories[:] = [
-            name for name in child_directories if not (directory_path / name).is_symlink()
-        ]
+        included_directories = []
+        for name in child_directories:
+            path = directory_path / name
+            if Path(os.path.abspath(path)) in excluded_paths:
+                encountered_exclusions.add(path)
+            elif not path.is_symlink():
+                included_directories.append(name)
+        child_directories[:] = included_directories
         directories_scanned += 1
 
         for filename in filenames:
             path = directory_path / filename
+            if Path(os.path.abspath(path)) in excluded_paths:
+                encountered_exclusions.add(path)
+                continue
             try:
                 metadata = path.lstat()
             except OSError as error:
@@ -90,5 +103,8 @@ def scan_directory(root: Path) -> ScanResult:
         media_entries=tuple(entries),
         inaccessible_paths=tuple(
             sorted(inaccessible_paths.values(), key=lambda item: item.path.as_posix())
+        ),
+        excluded_paths=tuple(
+            sorted(encountered_exclusions, key=lambda path: path.as_posix())
         ),
     )

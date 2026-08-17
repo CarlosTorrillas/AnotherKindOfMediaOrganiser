@@ -75,6 +75,7 @@ class ScanResult:
     unsupported_extension_counts: Mapping[str, int]
     media_entries: tuple[MediaEntry, ...]
     inaccessible_paths: tuple[InaccessiblePath, ...] = ()
+    excluded_paths: tuple[Path, ...] = ()
 
     @property
     def media_files(self) -> int:

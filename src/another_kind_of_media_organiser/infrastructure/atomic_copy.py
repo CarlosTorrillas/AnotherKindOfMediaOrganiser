@@ -1,7 +1,6 @@
 """Conservative filesystem copying for Organisation Execution."""
 
 import os
-import shutil
 import uuid
 from collections.abc import Callable
 from pathlib import Path
@@ -26,7 +25,12 @@ def copy_file(
     try:
         with source.open("rb") as source_file, temporary.open("xb") as temporary_file:
             _copy_stream(source_file, temporary_file, on_bytes_copied)
-        shutil.copystat(source, temporary)
+        temporary_metadata = temporary.stat()
+        source_mtime_ns = source.stat().st_mtime_ns
+        os.utime(
+            temporary,
+            ns=(temporary_metadata.st_atime_ns, source_mtime_ns),
+        )
         if _path_exists(destination):
             raise FileExistsError(destination)
         os.replace(temporary, destination)
