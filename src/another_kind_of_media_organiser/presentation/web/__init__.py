@@ -11,6 +11,14 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     if config:
         app.config.from_mapping(config)
 
+    from another_kind_of_media_organiser.presentation.web.verification_jobs import (
+        VerificationCoordinator,
+    )
+
+    app.extensions["verification_coordinator"] = app.config.get(
+        "VERIFICATION_COORDINATOR"
+    ) or VerificationCoordinator()
+
     from another_kind_of_media_organiser.presentation.web.routes import browser
 
     app.register_blueprint(browser)

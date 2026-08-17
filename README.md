@@ -41,8 +41,17 @@ media-organiser web --host 127.0.0.1 --port 8080
 It supports scans, repeatable relative exclusions, and lightweight Organisation
 Proposals with Name Conflict review. Scans run synchronously, so the page shows
 a working state and prevents duplicate submission while waiting. Proposal
-requests rescan the collection instead of retaining server-side state. Browser
-COPY, MOVE, collision verification, and file downloads are intentionally absent.
+requests rescan the collection instead of retaining server-side state.
+
+From a proposal containing collisions, `Verify Collisions` starts the existing
+deep, read-only verification workflow in a single background worker. Its opaque
+status URL can be refreshed while the server remains running and reports
+progress, cancellation, cache hits, bytes hashed, and at most five deterministic
+examples. Cancellation stops cooperatively at a streamed hashing progress
+callback; hashes from completed files remain in the persistent SQLite cache.
+A server restart discards transient browser job status, but restarting
+verification reuses valid completed hashes. Browser COPY, MOVE, and file
+downloads remain intentionally absent.
 
 The server binds only to localhost by default and does not use authentication.
 A non-local bind such as `--host 0.0.0.0` must be explicit and displays a
