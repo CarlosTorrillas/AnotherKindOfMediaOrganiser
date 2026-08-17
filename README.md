@@ -25,9 +25,28 @@ media-organiser propose /path/to/media
 media-organiser verify-collisions /path/to/media
 media-organiser organise /path/to/media --destination /separate/organised-media
 media-organiser organise /path/to/media --destination /separate/organised-media --move
+media-organiser web
 pytest
 behave
 ```
+
+The initial browser interface is server-rendered and strictly read-only. Start
+it, then open `http://127.0.0.1:8080` in a browser:
+
+```bash
+media-organiser web
+media-organiser web --host 127.0.0.1 --port 8080
+```
+
+It supports scans, repeatable relative exclusions, and lightweight Organisation
+Proposals with Name Conflict review. Scans run synchronously, so the page shows
+a working state and prevents duplicate submission while waiting. Proposal
+requests rescan the collection instead of retaining server-side state. Browser
+COPY, MOVE, collision verification, and file downloads are intentionally absent.
+
+The server binds only to localhost by default and does not use authentication.
+A non-local bind such as `--host 0.0.0.0` must be explicit and displays a
+warning because it makes the interface available beyond the current computer.
 
 Every scanning command accepts repeatable exclusions relative to its scan root:
 
@@ -96,7 +115,12 @@ The initial supported extensions are `.jpg`, `.jpeg`, `.png`, `.heic`, `.arw`, `
 
 ## Architecture
 
-Production code uses a `src` layout. The package has lightweight `domain`, `application`, and `infrastructure` namespaces so core organising behaviour can remain independent of presentation mechanisms such as the initial CLI or a future web UI. These namespaces intentionally contain no speculative abstractions yet.
+Production code uses a `src` layout. The package has lightweight `domain`,
+`application`, and `infrastructure` namespaces. CLI and web adapters live in
+the presentation boundary and call the same application workflows, keeping
+scanning and proposal behaviour independent of HTTP and terminal rendering.
+The browser adapter uses Flask and server-rendered Jinja templates; it does not
+duplicate domain or filesystem behaviour.
 
 Unit and integration tests live under `tests/`; Gherkin features and Behave step definitions live under `features/`.
 

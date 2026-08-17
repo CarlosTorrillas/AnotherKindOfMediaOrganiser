@@ -245,6 +245,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="copy, verify, then delete each source file (default: copy)",
     )
+    web_parser = subcommands.add_parser(
+        "web", help="start the local read-only browser interface"
+    )
+    web_parser.add_argument("--host", default="127.0.0.1")
+    web_parser.add_argument("--port", default=8080, type=int)
     return parser
 
 
@@ -394,6 +399,24 @@ def _print_collision_examples(proposal: OrganisationProposal) -> None:
 def main(arguments: Sequence[str] | None = None) -> int:
     """Run the command-line interface."""
     parsed_arguments = _build_parser().parse_args(arguments)
+    if parsed_arguments.command == "web":
+        from another_kind_of_media_organiser.presentation.web import create_app
+
+        host = parsed_arguments.host
+        print(f"Read-only browser interface: http://{host}:{parsed_arguments.port}")
+        if host not in {"127.0.0.1", "localhost", "::1"}:
+            print(
+                "WARNING: The server has no authentication and is accessible "
+                "beyond this computer.",
+                file=sys.stderr,
+            )
+        create_app().run(
+            host=host,
+            port=parsed_arguments.port,
+            debug=False,
+            use_reloader=False,
+        )
+        return 0
     if parsed_arguments.command in {
         "scan",
         "propose",

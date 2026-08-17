@@ -46,7 +46,7 @@ Feature: Review a Media Collection in a browser
 
   Scenario: Warn when a proposal is based on an incomplete scan
     Given the browser Scan Result is incomplete
-    When the user generates an Organisation Proposal
+    When the user requests a browser Organisation Proposal for the incomplete scan
     Then the proposal may include accessible media
     But a prominent proposal warning states that the underlying scan is incomplete
 

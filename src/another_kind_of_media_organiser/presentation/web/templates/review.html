@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+  {% if not result.is_complete %}
+    <div class="message warning" role="alert">
+      <strong>WARNING: Scan is incomplete.</strong>
+      {% if proposal %}Proposal includes accessible media only.{% else %}Results include accessible media only.{% endif %}
+    </div>
+  {% endif %}
+
+  <section class="panel">
+    <p class="eyebrow">{{ source }}</p>
+    <h1>Scan Result</h1>
+    <dl class="summary">
+      <dt>Total files</dt><dd>{{ result.total_files }}</dd>
+      <dt>Recognised media</dt><dd>{{ result.media_files }}</dd>
+      <dt>Images</dt><dd>{{ result.counts_by_category[MediaCategory.IMAGE] }}</dd>
+      <dt>RAW</dt><dd>{{ result.counts_by_category[MediaCategory.RAW] }}</dd>
+      <dt>Videos</dt><dd>{{ result.counts_by_category[MediaCategory.VIDEO] }}</dd>
+      <dt>Audio</dt><dd>{{ result.counts_by_category[MediaCategory.AUDIO] }}</dd>
+      <dt>Unsupported files</dt><dd>{{ result.unsupported_files }}</dd>
+      <dt>Directories scanned</dt><dd>{{ result.directories_scanned }}</dd>
+      <dt>Status</dt><dd>Scan complete: {{ "YES" if result.is_complete else "NO" }}</dd>
+      <dt>Excluded paths</dt><dd>{{ excluded|length }}</dd>
+      <dt>Inaccessible paths</dt><dd>{{ inaccessible|length }}</dd>
+    </dl>
+
+    {% if excluded_examples %}
+      <h2>Excluded path examples</h2>
+      <ul>{% for path in excluded_examples %}<li>{{ path }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% if inaccessible_examples %}
+      <h2>Inaccessible path examples</h2>
+      <ul>{% for item in inaccessible_examples %}<li>{{ item.path }} ({{ item.reason }})</li>{% endfor %}</ul>
+    {% endif %}
+  </section>
+
+  {% if proposal %}
+    <section class="panel">
+      <p class="eyebrow">Read-only plan</p>
+      <h1>Organisation Proposal</h1>
+      <p>No files have been changed.</p>
+      <dl class="summary">
+        <dt>Media files</dt><dd>{{ proposal.placements|length }}</dd>
+        <dt>Proposed destinations</dt><dd>{{ proposal.placements|length }}</dd>
+        <dt>Destination collisions</dt><dd>{{ proposal.collision_destinations|length }}</dd>
+        <dt>Name Conflict files</dt><dd>{{ proposal.name_conflict_files }}</dd>
+      </dl>
+      <h2>Years</h2>
+      <ul>{% for year, count in year_counts %}<li>{{ year }}: {{ count }}</li>{% else %}<li>No recognised media.</li>{% endfor %}</ul>
+      {% if collisions %}
+        <h2>Collision examples</h2>
+        {% for destination, placements in collisions %}
+          <article class="collision">
+            <h3>{{ destination }}</h3>
+            <ul>{% for placement in placements %}<li><strong>{{ placement.classification.value|replace('_', ' ')|title }}:</strong> {{ placement.source.path }}</li>{% endfor %}</ul>
+          </article>
+        {% endfor %}
+        <p>Showing {{ collisions|length }} of {{ proposal.collision_destinations|length }} collisions.</p>
+      {% endif %}
+    </section>
+  {% else %}
+    <form method="post" action="{{ url_for('browser.proposal') }}" data-submission-form>
+      <input type="hidden" name="source" value="{{ source }}">
+      {% for exclusion in exclusions %}<input type="hidden" name="exclude" value="{{ exclusion }}">{% endfor %}
+      <button type="submit">Generate Organisation Proposal</button>
+      <p class="working" role="status" aria-live="polite" hidden data-working>Generating proposal…</p>
+    </form>
+  {% endif %}
+  <p><a href="{{ url_for('browser.index') }}">Scan another collection</a></p>
+{% endblock %}
