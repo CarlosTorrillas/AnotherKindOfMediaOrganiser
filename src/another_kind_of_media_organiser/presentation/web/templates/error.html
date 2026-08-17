@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel">
+    <h1>Request failed</h1>
+    <div class="message error" role="alert">{{ message }}</div>
+    <p>No files have been changed.</p>
+    <a href="{{ url_for('browser.index') }}">Return to the scan form</a>
+  </section>
+{% endblock %}
