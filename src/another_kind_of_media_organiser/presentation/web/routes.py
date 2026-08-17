@@ -2,6 +2,7 @@
 
 from collections import Counter
 from pathlib import Path
+import calendar
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request, url_for
 
@@ -17,6 +18,11 @@ from another_kind_of_media_organiser.presentation.web.verification_jobs import (
     VerificationCoordinator,
     VerificationJob,
     VerificationState,
+)
+from another_kind_of_media_organiser.presentation.web.copy_jobs import (
+    CopyCoordinator,
+    CopyRecord,
+    CopyState,
 )
 
 
@@ -85,6 +91,70 @@ def cancel_verification(job_id: str) -> tuple[str, int]:
         url_for("browser.verification_status", job_id=job_id),
         code=303,
     )
+
+
+@browser.post("/copy-preflights")
+def start_copy_preflight() -> tuple[str, int] | str:
+    prepared = _prepare_submission()
+    if _is_error_response(prepared):
+        return prepared
+    source, exclusions = prepared
+    destination_value = request.form.get("destination", "").strip()
+    if not destination_value:
+        return _validation_error(
+            "A Destination Collection path is required.",
+            str(source),
+            tuple(str(path) for path in exclusions),
+        )
+    try:
+        record = _copy_coordinator().prepare(
+            source, Path(destination_value), exclusions
+        )
+    except (OSError, ValueError) as error:
+        return (
+            render_template(
+                "error.html",
+                message=str(error),
+                source=source,
+                exclusions=exclusions,
+            ),
+            400,
+        )
+    return redirect(
+        url_for("browser.copy_preflight", copy_id=record.copy_id), code=303
+    )
+
+
+@browser.get("/copy-preflights/<copy_id>")
+def copy_preflight(copy_id: str) -> str:
+    record = _copy_coordinator().get(copy_id)
+    if record is None:
+        abort(404)
+    return _render_copy_preflight(record)
+
+
+@browser.post("/copy-preflights/<copy_id>/decision")
+def decide_copy(copy_id: str) -> tuple[str, int]:
+    coordinator = _copy_coordinator()
+    if request.form.get("decision") == "confirm":
+        record = coordinator.confirm(
+            copy_id, acceptance=request.form.get("acceptance", "")
+        )
+        if record is None:
+            record = coordinator.decline(copy_id)
+    else:
+        record = coordinator.decline(copy_id)
+    if record is None:
+        abort(404)
+    return redirect(url_for("browser.copy_status", copy_id=copy_id), code=303)
+
+
+@browser.get("/copies/<copy_id>")
+def copy_status(copy_id: str) -> str:
+    record = _copy_coordinator().get(copy_id)
+    if record is None:
+        abort(404)
+    return _render_copy_status(record)
 
 
 @browser.app_errorhandler(500)
@@ -204,6 +274,10 @@ def _verification_coordinator() -> VerificationCoordinator:
     return current_app.extensions["verification_coordinator"]
 
 
+def _copy_coordinator() -> CopyCoordinator:
+    return current_app.extensions["copy_coordinator"]
+
+
 def _render_verification(job: VerificationJob) -> str:
     proposal = job.proposal
     collisions = _collision_examples(proposal) if proposal else ()
@@ -256,3 +330,50 @@ def _format_bytes(count: int) -> str:
             return f"{int(value)} B" if unit == "B" else f"{value:.1f} {unit}"
         value /= 1024
     raise AssertionError("unreachable")
+
+
+def _render_copy_preflight(record: CopyRecord) -> str:
+    capacity = record.capacity
+    estimated_remaining = (
+        capacity.usable_bytes - capacity.execution_required_bytes
+        if capacity.execution_proposal is not None
+        else capacity.usable_bytes
+    )
+    return render_template(
+        "copy_preflight.html",
+        record=record,
+        capacity=capacity,
+        state=CopyState,
+        logical_size=_format_bytes(capacity.logical_required_bytes),
+        required_space=_format_bytes(capacity.required_bytes),
+        available_space=_format_bytes(capacity.available_bytes),
+        reserve=_format_bytes(capacity.reserve_bytes),
+        estimated_remaining=_format_bytes(estimated_remaining),
+        execution_required=_format_bytes(capacity.execution_required_bytes),
+        month_range=(
+            _format_month_range(capacity.included_months)
+            if capacity.included_months
+            else None
+        ),
+    )
+
+
+def _render_copy_status(record: CopyRecord) -> str:
+    progress = record.progress
+    return render_template(
+        "copy_status.html",
+        record=record,
+        state=CopyState,
+        progress=progress,
+        bytes_copied=(
+            _format_bytes(progress.bytes_copied) if progress else "0 B"
+        ),
+    )
+
+
+def _format_month_range(months: tuple[tuple[int, int], ...]) -> str:
+    first_year, first_month = months[0]
+    last_year, last_month = months[-1]
+    first = f"{first_year} {calendar.month_name[first_month]}"
+    last = f"{last_year} {calendar.month_name[last_month]}"
+    return first if first == last else f"{first} → {last}"

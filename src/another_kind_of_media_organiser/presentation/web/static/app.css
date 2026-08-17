@@ -10,6 +10,7 @@ label, legend { display: block; font-weight: 700; margin: 1rem 0 .4rem; }
 legend span { font-weight: 400; }
 fieldset { border: 0; padding: 0; }
 input { box-sizing: border-box; display: block; width: 100%; max-width: 48rem; padding: .7rem; margin-bottom: .6rem; border: 1px solid #82908c; border-radius: .3rem; font: inherit; }
+input.inline { display: inline; width: auto; }
 button { margin: .75rem .5rem 0 0; padding: .75rem 1rem; border: 0; border-radius: .35rem; background: #176b59; color: white; font: inherit; font-weight: 700; cursor: pointer; }
 button.secondary { color: #173a36; background: #dce9e5; }
 button:disabled { opacity: .6; cursor: wait; }

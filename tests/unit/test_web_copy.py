@@ -15,7 +15,14 @@ from another_kind_of_media_organiser.presentation.web import create_app
 from another_kind_of_media_organiser.presentation.web.copy_jobs import (
     CopyCoordinator,
     CopyState,
+    IncompleteScanError,
 )
+from another_kind_of_media_organiser.domain.media import (
+    InaccessiblePath,
+    MediaCategory,
+    ScanResult,
+)
+import pytest
 
 
 def _media(path: Path, content: bytes, year: int = 2024, month: int = 1) -> None:
@@ -62,6 +69,11 @@ def test_preflight_page_is_read_only_and_requires_explicit_confirmation(
 
     assert response.status_code == 200
     assert b"Capacity Preflight" in response.data
+    assert b"Logical media size" in response.data
+    assert b"Required space" in response.data
+    assert b"Available space" in response.data
+    assert b"Safety reserve" in response.data
+    assert b"Estimated remaining space" in response.data
     assert b"Operation</dt><dd>COPY" in response.data
     assert b"Source files will NOT be deleted." in response.data
     assert b"Confirm COPY" in response.data
@@ -188,3 +200,96 @@ def test_replayed_confirmation_does_not_start_a_second_copy(tmp_path: Path) -> N
 
     assert second is first
     assert calls == 1
+
+
+def test_running_copy_displays_reconnectable_progress(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    _media(source / "photo.jpg", b"valuable")
+    release = Event()
+
+    def controlled_executor(plan, callback):
+        callback(OrganisationExecutionProgress(0, 1, 18_4 * 1024**3 // 10))
+        release.wait(timeout=5)
+        return type("Result", (), {"files_copied": 0, "total_files": 1, "bytes_copied": 0})()
+
+    coordinator = _coordinator(executor=controlled_executor)
+    record = coordinator.prepare(source, destination, ())
+    coordinator.confirm(record.copy_id, acceptance="copy")
+    assert record.started.wait(timeout=2)
+
+    response = _client(coordinator).get(f"/copies/{record.copy_id}")
+    release.set()
+
+    assert b"Organisation COPY is running" in response.data
+    assert b"Files copied</dt><dd>0 / 1" in response.data
+    assert b"Data copied</dt><dd>18.4 GiB" in response.data
+
+
+def test_incomplete_scan_refuses_browser_copy_before_any_write(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import another_kind_of_media_organiser.presentation.web.copy_jobs as copy_jobs
+
+    source = tmp_path / "source"
+    source.mkdir()
+    destination = tmp_path / "destination"
+    result = ScanResult(
+        total_files=0,
+        unsupported_files=0,
+        directories_scanned=1,
+        counts_by_category={category: 0 for category in MediaCategory},
+        recognised_extension_counts={},
+        unsupported_extension_counts={},
+        media_entries=(),
+        inaccessible_paths=(
+            InaccessiblePath(source / "private", "Permission denied"),
+        ),
+    )
+    monkeypatch.setattr(copy_jobs, "scan_media_collection", lambda *_a, **_k: result)
+
+    with pytest.raises(IncompleteScanError):
+        _coordinator().prepare(source, destination, ())
+
+    assert not destination.exists()
+
+
+def test_capacity_drop_after_review_refuses_confirmation_without_writing(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    _media(source / "photo.jpg", b"valuable")
+    available = [DEFAULT_SAFETY_RESERVE_BYTES + 1024]
+    coordinator = CopyCoordinator(
+        available_capacity_provider=lambda _path: available[0],
+        allocation_unit_provider=lambda _path: 1,
+    )
+    record = coordinator.prepare(source, destination, ())
+
+    available[0] = DEFAULT_SAFETY_RESERVE_BYTES
+    refused = coordinator.confirm(record.copy_id, acceptance="copy")
+
+    assert refused is record
+    assert record.state is CopyState.FAILED
+    assert "no longer has enough usable capacity" in record.error
+    assert not destination.exists()
+    assert (source / "photo.jpg").read_bytes() == b"valuable"
+
+
+def test_missing_confirmation_defaults_to_decline(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    _media(source / "photo.jpg", b"valuable")
+    coordinator = _coordinator()
+    record = coordinator.prepare(source, destination, ())
+    client = _client(coordinator)
+
+    response = client.post(
+        f"/copy-preflights/{record.copy_id}/decision",
+        data={"decision": "confirm"},
+        follow_redirects=True,
+    )
+
+    assert b"Organisation COPY declined" in response.data
+    assert not destination.exists()

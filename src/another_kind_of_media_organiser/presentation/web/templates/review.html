@@ -63,6 +63,15 @@
           <p class="working" role="status" aria-live="polite" hidden data-working>Starting deep collision verification…</p>
         </form>
       {% endif %}
+      <h2>Organise by COPY</h2>
+      <form method="post" action="{{ url_for('browser.start_copy_preflight') }}" data-submission-form>
+        <input type="hidden" name="source" value="{{ source }}">
+        {% for exclusion in exclusions %}<input type="hidden" name="exclude" value="{{ exclusion }}">{% endfor %}
+        <label for="destination">Destination Collection path</label>
+        <input id="destination" name="destination" type="text" required placeholder="/Volumes/OrganisedMedia">
+        <button type="submit">Run Capacity Preflight</button>
+        <p class="working" role="status" aria-live="polite" hidden data-working>Checking destination capacity…</p>
+      </form>
     </section>
   {% else %}
     <form method="post" action="{{ url_for('browser.proposal') }}" data-submission-form>

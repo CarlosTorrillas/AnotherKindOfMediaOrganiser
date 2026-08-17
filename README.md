@@ -50,8 +50,18 @@ progress, cancellation, cache hits, bytes hashed, and at most five deterministic
 examples. Cancellation stops cooperatively at a streamed hashing progress
 callback; hashes from completed files remain in the persistent SQLite cache.
 A server restart discards transient browser job status, but restarting
-verification reuses valid completed hashes. Browser COPY, MOVE, and file
-downloads remain intentionally absent.
+verification reuses valid completed hashes. Browser MOVE and file downloads
+remain intentionally absent.
+
+An accepted lightweight proposal can also run Capacity Preflight and COPY from
+the browser. Preflight remains read-only, reports allocation-aware required
+space and the separate safety reserve, and presents the same chronological
+partial proposal when the full proposal does not fit. COPY requires an explicit
+unchecked-by-default confirmation; capacity and destination conflicts are
+revalidated at confirmation time before the accepted plan is queued. A single
+background COPY worker provides a reconnectable progress/result page and
+prevents confirmation replay from starting duplicate execution. Browser COPY
+never invokes MOVE and never deletes source media.
 
 The server binds only to localhost by default and does not use authentication.
 A non-local bind such as `--host 0.0.0.0` must be explicit and displays a

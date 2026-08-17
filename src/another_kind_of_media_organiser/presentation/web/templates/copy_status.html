@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block head %}{% if record.is_active %}<meta http-equiv="refresh" content="2">{% endif %}{% endblock %}
+{% block content %}
+  <section class="panel">
+    <p class="eyebrow">Operation: COPY</p>
+    {% if record.state == state.QUEUED %}
+      <h1>COPY is queued</h1>
+      <p class="working" role="status">Waiting for the current COPY to finish…</p>
+    {% elif record.state == state.RUNNING %}
+      <h1>Organisation COPY is running</h1>
+      <p class="working" role="status">Copying media. This page refreshes automatically.</p>
+      {% if progress %}
+        <progress max="{{ progress.total_files }}" value="{{ progress.files_copied }}">{{ progress.files_copied }} / {{ progress.total_files }}</progress>
+        <dl class="summary">
+          <dt>Files copied</dt><dd>{{ progress.files_copied }} / {{ progress.total_files }}</dd>
+          <dt>Data copied</dt><dd>{{ bytes_copied }}</dd>
+        </dl>
+      {% endif %}
+      <p>Source files will NOT be deleted.</p>
+    {% elif record.state == state.COMPLETED %}
+      <h1>Organisation COPY completed</h1>
+      <dl class="summary">
+        <dt>Files copied</dt><dd>{{ record.result.files_copied }} / {{ record.result.total_files }}</dd>
+        <dt>Data copied</dt><dd>{{ bytes_copied }}</dd>
+      </dl>
+      <p>Source files have not been modified.</p>
+    {% elif record.state == state.DECLINED %}
+      <h1>Organisation COPY declined</h1>
+      <p>No filesystem content has been modified.</p>
+    {% elif record.state == state.FAILED %}
+      <h1>Organisation execution failed.</h1>
+      <div class="message error" role="alert">Reason: {{ record.error }}</div>
+      {% if record.failed_source %}
+        <dl class="summary">
+          <dt>Failed source</dt><dd>{{ record.failed_source }}</dd>
+          <dt>Failed destination</dt><dd>{{ record.failed_destination }}</dd>
+          <dt>Files copied</dt><dd>{{ record.files_copied_before_failure }} / {{ record.total_files }}</dd>
+        </dl>
+      {% endif %}
+      <p>Source files have not been modified.</p>
+      <p>Destination may contain successfully completed copies.</p>
+    {% endif %}
+  </section>
+  <p><a href="{{ url_for('browser.index') }}">Return to the scan form</a></p>
+{% endblock %}

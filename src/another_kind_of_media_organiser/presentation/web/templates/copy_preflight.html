@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel">
+    <p class="eyebrow">Read-only safety check</p>
+    <h1>Capacity Preflight</h1>
+    {% if capacity.is_partial %}
+      <div class="message warning" role="alert"><strong>Full organisation does not fit.</strong></div>
+      <h2>Proposed partial organisation</h2>
+      <p>{{ month_range }}</p>
+    {% elif capacity.execution_proposal is none %}
+      <div class="message error" role="alert"><strong>Full organisation does not fit.</strong> No complete Year/Month group fits usable capacity.</div>
+    {% endif %}
+    <dl class="summary">
+      <dt>Media files</dt><dd>{{ capacity.requested_proposal.placements|length }}</dd>
+      <dt>Logical media size</dt><dd>{{ logical_size }}</dd>
+      <dt>Required space</dt><dd>{{ required_space }}</dd>
+      <dt>Available space</dt><dd>{{ available_space }}</dd>
+      <dt>Safety reserve</dt><dd>{{ reserve }}</dd>
+      <dt>Estimated remaining space</dt><dd>{{ estimated_remaining }}</dd>
+    </dl>
+    {% if capacity.execution_proposal is not none %}
+      <h2>Confirm Organisation Execution</h2>
+      <dl class="summary">
+        <dt>Operation</dt><dd>COPY</dd>
+        <dt>Source</dt><dd>{{ record.source }}</dd>
+        <dt>Destination</dt><dd>{{ record.destination }}</dd>
+        <dt>Files</dt><dd>{{ record.plan.items|length }}</dd>
+        <dt>Required space</dt><dd>{{ execution_required }}</dd>
+      </dl>
+      <p><strong>Source files will NOT be deleted.</strong></p>
+      <p>Continue? The default is NO.</p>
+      <form method="post" action="{{ url_for('browser.decide_copy', copy_id=record.copy_id) }}">
+        <input type="hidden" name="decision" value="confirm">
+        <label><input class="inline" type="checkbox" name="acceptance" value="{{ 'partial-copy' if capacity.is_partial else 'copy' }}" required> I explicitly accept this {{ 'partial ' if capacity.is_partial }}COPY.</label>
+        <button type="submit">Confirm COPY</button>
+      </form>
+      <form method="post" action="{{ url_for('browser.decide_copy', copy_id=record.copy_id) }}">
+        <input type="hidden" name="decision" value="decline">
+        <button class="secondary" type="submit">Decline</button>
+      </form>
+    {% endif %}
+    <p>No filesystem content has been modified.</p>
+  </section>
+{% endblock %}
