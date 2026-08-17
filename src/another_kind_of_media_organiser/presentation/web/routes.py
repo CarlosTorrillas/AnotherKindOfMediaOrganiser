@@ -3,7 +3,7 @@
 from collections import Counter
 from pathlib import Path
 
-from flask import Blueprint, render_template, request
+from flask import Blueprint, abort, current_app, redirect, render_template, request, url_for
 
 from another_kind_of_media_organiser.application.generate_organisation_proposal import (
     generate_organisation_proposal,
@@ -13,6 +13,11 @@ from another_kind_of_media_organiser.application.scan_media_collection import (
 )
 from another_kind_of_media_organiser.domain.media import MediaCategory, ScanResult
 from another_kind_of_media_organiser.domain.organisation import OrganisationProposal
+from another_kind_of_media_organiser.presentation.web.verification_jobs import (
+    VerificationCoordinator,
+    VerificationJob,
+    VerificationState,
+)
 
 
 browser = Blueprint("browser", __name__)
@@ -48,6 +53,38 @@ def proposal() -> tuple[str, int] | str:
         return result
     organisation_proposal = generate_organisation_proposal(result)
     return _render_review(source, exclusions, result, organisation_proposal)
+
+
+@browser.post("/verifications")
+def start_verification() -> tuple[str, int] | str:
+    prepared = _prepare_submission()
+    if _is_error_response(prepared):
+        return prepared
+    source, exclusions = prepared
+    job = _verification_coordinator().submit(source, exclusions)
+    return redirect(
+        url_for("browser.verification_status", job_id=job.job_id),
+        code=303,
+    )
+
+
+@browser.get("/verifications/<job_id>")
+def verification_status(job_id: str) -> str:
+    job = _verification_coordinator().get(job_id)
+    if job is None:
+        abort(404)
+    return _render_verification(job)
+
+
+@browser.post("/verifications/<job_id>/cancel")
+def cancel_verification(job_id: str) -> tuple[str, int]:
+    job = _verification_coordinator().cancel(job_id)
+    if job is None:
+        abort(404)
+    return redirect(
+        url_for("browser.verification_status", job_id=job_id),
+        code=303,
+    )
 
 
 @browser.app_errorhandler(500)
@@ -143,28 +180,7 @@ def _render_review(
         if proposal
         else ()
     )
-    collisions = (
-        tuple(
-            (
-                destination,
-                tuple(
-                    sorted(
-                        (
-                            placement
-                            for placement in proposal.placements
-                            if placement.normal_destination == destination
-                        ),
-                        key=lambda placement: placement.source.path,
-                    )
-                ),
-            )
-            for destination in proposal.collision_destinations[
-                :_MAX_COLLISION_EXAMPLES
-            ]
-        )
-        if proposal
-        else ()
-    )
+    collisions = _collision_examples(proposal) if proposal else ()
     return render_template(
         "review.html",
         source=source,
@@ -182,3 +198,61 @@ def _render_review(
         ),
         MediaCategory=MediaCategory,
     )
+
+
+def _verification_coordinator() -> VerificationCoordinator:
+    return current_app.extensions["verification_coordinator"]
+
+
+def _render_verification(job: VerificationJob) -> str:
+    proposal = job.proposal
+    collisions = _collision_examples(proposal) if proposal else ()
+    progress = job.progress
+    percentage = (
+        progress.processed_candidates * 100 // progress.total_candidates
+        if progress is not None and progress.total_candidates
+        else 0
+    )
+    return render_template(
+        "verification.html",
+        job=job,
+        state=VerificationState,
+        progress=progress,
+        percentage=percentage,
+        proposal=proposal,
+        collisions=collisions,
+        collision_total=(
+            f"{len(proposal.collision_destinations):,}" if proposal else "0"
+        ),
+        hashed_bytes=_format_bytes(progress.bytes_hashed) if progress else "0 B",
+    )
+
+
+def _collision_examples(
+    proposal: OrganisationProposal,
+) -> tuple[tuple[Path, tuple], ...]:
+    return tuple(
+        (
+            destination,
+            tuple(
+                sorted(
+                    (
+                        placement
+                        for placement in proposal.placements
+                        if placement.normal_destination == destination
+                    ),
+                    key=lambda placement: placement.source.path,
+                )
+            ),
+        )
+        for destination in proposal.collision_destinations[:_MAX_COLLISION_EXAMPLES]
+    )
+
+
+def _format_bytes(count: int) -> str:
+    value = float(count)
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if value < 1024 or unit == "TiB":
+            return f"{int(value)} B" if unit == "B" else f"{value:.1f} {unit}"
+        value /= 1024
+    raise AssertionError("unreachable")

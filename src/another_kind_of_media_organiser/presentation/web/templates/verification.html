@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block head %}{% if job.is_active %}<meta http-equiv="refresh" content="2">{% endif %}{% endblock %}
+{% block content %}
+  <section class="panel">
+    <p class="eyebrow">{{ job.source }}</p>
+    {% if job.state == state.QUEUED %}
+      <h1>Verification is queued</h1>
+      <p class="working" role="status">Waiting for the current verification to finish…</p>
+    {% elif job.state == state.RUNNING %}
+      <h1>Verification is running</h1>
+      <p class="working" role="status">Deeply verifying destination collisions. This page refreshes automatically.</p>
+      {% if progress %}
+        <progress max="{{ progress.total_candidates }}" value="{{ progress.processed_candidates }}">{{ percentage }}%</progress>
+        <p>{{ progress.processed_candidates }} / {{ progress.total_candidates }} candidates ({{ percentage }}%)</p>
+        <dl class="summary">
+          <dt>Exact Duplicates</dt><dd>{{ progress.exact_duplicate_files }}</dd>
+          <dt>Potential Conflicts</dt><dd>{{ progress.potential_conflict_files }}</dd>
+          <dt>Unverified Conflicts</dt><dd>{{ progress.unverified_conflict_files }}</dd>
+          <dt>Cache hits</dt><dd>{{ progress.cache_hits }}</dd>
+          <dt>Hashed this run</dt><dd>{{ hashed_bytes }}</dd>
+        </dl>
+      {% endif %}
+      <form method="post" action="{{ url_for('browser.cancel_verification', job_id=job.job_id) }}">
+        <button type="submit" class="secondary">Cancel verification</button>
+      </form>
+    {% elif job.state == state.CANCELLED %}
+      <h1>Verification cancelled</h1>
+      <p>Completed hashes remain cached and can be reused.</p>
+      <p>No files have been changed.</p>
+    {% elif job.state == state.FAILED %}
+      <h1>Verification failed safely</h1>
+      <div class="message error" role="alert">{{ job.error }}</div>
+      <p>No files have been changed.</p>
+    {% elif job.state == state.COMPLETED %}
+      <h1>Collision Verification Result</h1>
+      {% if job.scan_result and not job.scan_result.is_complete %}
+        <div class="message warning" role="alert"><strong>WARNING: Scan is incomplete.</strong> Verification covers accessible media only.</div>
+      {% endif %}
+      <p>No files have been changed.</p>
+      <dl class="summary">
+        <dt>Destination Collisions</dt><dd>{{ proposal.collision_destinations|length }}</dd>
+        <dt>Exact Duplicates</dt><dd>{{ proposal.exact_duplicate_files }}</dd>
+        <dt>Potential Conflicts</dt><dd>{{ proposal.potential_conflict_files }}</dd>
+        <dt>Unverified Conflicts</dt><dd>{{ proposal.unverified_conflict_files }}</dd>
+        <dt>Cache hits</dt><dd>{{ progress.cache_hits }}</dd>
+        <dt>Hashed this run</dt><dd>{{ hashed_bytes }}</dd>
+      </dl>
+      {% if collisions %}
+        <h2>Verification examples</h2>
+        {% for destination, placements in collisions %}
+          <article class="collision">
+            <h3>{{ destination }}</h3>
+            <ul>{% for placement in placements %}<li><strong>{{ placement.classification.value|replace('_', ' ')|title }}:</strong> {{ placement.source.path }}</li>{% endfor %}</ul>
+          </article>
+        {% endfor %}
+        <p>Showing {{ collisions|length }} of {{ collision_total }} collisions</p>
+      {% endif %}
+    {% endif %}
+  </section>
+  <p><a href="{{ url_for('browser.index') }}">Return to the scan form</a></p>
+{% endblock %}

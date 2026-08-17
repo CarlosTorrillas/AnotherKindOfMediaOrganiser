@@ -71,6 +71,7 @@ def test_proposal_displays_deterministic_name_conflicts(client, tmp_path: Path) 
     assert b"2025/02-February/IMAGE/IMG_001.jpg" in response.data
     assert b"camera-a" in response.data
     assert b"camera-b" in response.data
+    assert b"Verify Collisions" in response.data
 
 
 def test_missing_source_is_a_friendly_error_without_traceback(client, tmp_path: Path) -> None:
