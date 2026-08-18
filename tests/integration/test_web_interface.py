@@ -37,7 +37,7 @@ def test_complete_scan_displays_counts_and_proposal_action(client, tmp_path: Pat
 
     assert response.status_code == 200
     assert b"Scan Result" in response.data
-    assert b"Scan complete: YES" in response.data
+    assert b">Complete<" in response.data
     assert b"Recognised media" in response.data
     assert b"Unsupported files" in response.data
     assert b"Directories scanned" in response.data
@@ -71,7 +71,23 @@ def test_proposal_displays_deterministic_name_conflicts(client, tmp_path: Path) 
     assert b"2025/02-February/IMAGE/IMG_001.jpg" in response.data
     assert b"camera-a" in response.data
     assert b"camera-b" in response.data
+    assert b"Canonical" in response.data
+    assert b"Name Conflict" in response.data
     assert b"Verify Collisions" in response.data
+
+
+def test_proposal_presents_years_and_safe_copy_guidance(
+    client, tmp_path: Path
+) -> None:
+    _dated_file(tmp_path / "photo.jpg")
+
+    response = client.post("/proposal", data={"source": str(tmp_path)})
+
+    assert b'aria-label="Media by year"' in response.data
+    assert b"2025" in response.data
+    assert b"1 media file" in response.data
+    assert b"Recommended safer option" in response.data
+    assert b"Source files remain untouched." in response.data
 
 
 def test_missing_source_is_a_friendly_error_without_traceback(client, tmp_path: Path) -> None:
