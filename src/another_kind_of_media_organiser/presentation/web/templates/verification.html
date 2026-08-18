@@ -4,10 +4,10 @@
   <section class="panel">
     <p class="eyebrow">{{ job.source }}</p>
     {% if job.state == state.QUEUED %}
-      <h1>Verification is queued</h1>
+      <div class="section-heading"><span class="heading-icon" aria-hidden="true">⏳</span><h1>Verification is queued</h1></div>
       <p class="working" role="status">Waiting for the current verification to finish…</p>
     {% elif job.state == state.RUNNING %}
-      <h1>Verification is running</h1>
+      <div class="section-heading"><span class="heading-icon" aria-hidden="true">🔬</span><h1>Verification is running</h1></div>
       <p class="working" role="status">Deeply verifying destination collisions. This page refreshes automatically.</p>
       {% if progress %}
         <progress max="{{ progress.total_candidates }}" value="{{ progress.processed_candidates }}">{{ percentage }}%</progress>
@@ -24,15 +24,15 @@
         <button type="submit" class="secondary">Cancel verification</button>
       </form>
     {% elif job.state == state.CANCELLED %}
-      <h1>Verification cancelled</h1>
+      <div class="section-heading"><span class="heading-icon" aria-hidden="true">↩️</span><h1>Verification cancelled</h1></div>
       <p>Completed hashes remain cached and can be reused.</p>
       <p>No files have been changed.</p>
     {% elif job.state == state.FAILED %}
-      <h1>Verification failed safely</h1>
+      <div class="section-heading"><span class="heading-icon" aria-hidden="true">❌</span><h1>Verification failed safely</h1></div>
       <div class="message error" role="alert">{{ job.error }}</div>
       <p>No files have been changed.</p>
     {% elif job.state == state.COMPLETED %}
-      <h1>Collision Verification Result</h1>
+      <div class="section-heading"><span class="heading-icon" aria-hidden="true">✅</span><h1>Collision Verification Result</h1></div>
       {% if job.scan_result and not job.scan_result.is_complete %}
         <div class="message warning" role="alert"><strong>WARNING: Scan is incomplete.</strong> Verification covers accessible media only.</div>
       {% endif %}
@@ -57,5 +57,5 @@
       {% endif %}
     {% endif %}
   </section>
-  <p><a href="{{ url_for('browser.index') }}">Return to the scan form</a></p>
+  <p><a class="back-link" href="{{ url_for('browser.index') }}">← Return to the scan form</a></p>
 {% endblock %}

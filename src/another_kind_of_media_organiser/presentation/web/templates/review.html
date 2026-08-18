@@ -9,8 +9,8 @@
 
   <section class="panel">
     <p class="eyebrow">{{ source }}</p>
-    <h1>Scan Result</h1>
-    <dl class="summary">
+    <div class="section-heading"><span class="heading-icon" aria-hidden="true">🔎</span><div><h1>Scan Result</h1><p>Your collection at a glance.</p></div></div>
+    <dl class="summary overview-summary">
       <dt>Total files</dt><dd>{{ result.total_files }}</dd>
       <dt>Recognised media</dt><dd>{{ result.media_files }}</dd>
       <dt>Images</dt><dd>{{ result.counts_by_category[MediaCategory.IMAGE] }}</dd>
@@ -19,7 +19,7 @@
       <dt>Audio</dt><dd>{{ result.counts_by_category[MediaCategory.AUDIO] }}</dd>
       <dt>Unsupported files</dt><dd>{{ result.unsupported_files }}</dd>
       <dt>Directories scanned</dt><dd>{{ result.directories_scanned }}</dd>
-      <dt>Status</dt><dd>Scan complete: {{ "YES" if result.is_complete else "NO" }}</dd>
+      <dt>Status</dt><dd><span class="status-pill {{ 'success' if result.is_complete else 'caution' }}">Scan complete: {{ "YES" if result.is_complete else "NO" }}</span></dd>
       <dt>Excluded paths</dt><dd>{{ excluded|length }}</dd>
       <dt>Inaccessible paths</dt><dd>{{ inaccessible|length }}</dd>
     </dl>
@@ -37,9 +37,8 @@
   {% if proposal %}
     <section class="panel">
       <p class="eyebrow">Read-only plan</p>
-      <h1>Organisation Proposal</h1>
-      <p>No files have been changed.</p>
-      <dl class="summary">
+      <div class="section-heading"><span class="heading-icon" aria-hidden="true">✨</span><div><h1>Organisation Proposal</h1><p>No files have been changed.</p></div></div>
+      <dl class="summary overview-summary">
         <dt>Media files</dt><dd>{{ proposal.placements|length }}</dd>
         <dt>Proposed destinations</dt><dd>{{ proposal.placements|length }}</dd>
         <dt>Destination collisions</dt><dd>{{ proposal.collision_destinations|length }}</dd>
@@ -63,16 +62,21 @@
           <p class="working" role="status" aria-live="polite" hidden data-working>Starting deep collision verification…</p>
         </form>
       {% endif %}
+      <div class="action-grid">
+      <section class="action-card copy-card">
+      <span class="action-icon" aria-hidden="true">📋</span>
       <h2>Organise by COPY</h2>
+      <p>Create an organised collection while keeping every source file untouched.</p>
       <form method="post" action="{{ url_for('browser.start_copy_preflight') }}" data-submission-form>
         <input type="hidden" name="source" value="{{ source }}">
         {% for exclusion in exclusions %}<input type="hidden" name="exclude" value="{{ exclusion }}">{% endfor %}
         <label for="destination">Destination Collection path</label>
         <input id="destination" name="destination" type="text" required placeholder="/Volumes/OrganisedMedia">
-        <button type="submit">Run Capacity Preflight</button>
+        <button type="submit">Check capacity <span aria-hidden="true">→</span></button>
         <p class="working" role="status" aria-live="polite" hidden data-working>Checking destination capacity…</p>
-      </form>
-      <div class="danger-zone">
+      </form></section>
+      <section class="danger-zone action-card">
+        <span class="action-icon" aria-hidden="true">⚠️</span>
         <h2>Organise by verified MOVE</h2>
         <p>MOVE deletes each source only after its destination copy has been verified.</p>
         <form method="post" action="{{ url_for('browser.start_move_preflight') }}" data-submission-form>
@@ -80,18 +84,18 @@
           {% for exclusion in exclusions %}<input type="hidden" name="exclude" value="{{ exclusion }}">{% endfor %}
           <label for="move-destination">Destination Collection path for MOVE</label>
           <input id="move-destination" name="destination" type="text" required placeholder="/Volumes/OrganisedMedia">
-          <button class="danger" type="submit">Review MOVE safety</button>
+          <button class="danger" type="submit">Review MOVE safety <span aria-hidden="true">→</span></button>
           <p class="working" role="status" aria-live="polite" hidden data-working>Checking MOVE capacity and safety…</p>
         </form>
-      </div>
+      </section></div>
     </section>
   {% else %}
     <form method="post" action="{{ url_for('browser.proposal') }}" data-submission-form>
       <input type="hidden" name="source" value="{{ source }}">
       {% for exclusion in exclusions %}<input type="hidden" name="exclude" value="{{ exclusion }}">{% endfor %}
-      <button type="submit">Generate Organisation Proposal</button>
+      <button type="submit">✨ Generate Organisation Proposal</button>
       <p class="working" role="status" aria-live="polite" hidden data-working>Generating proposal…</p>
     </form>
   {% endif %}
-  <p><a href="{{ url_for('browser.index') }}">Scan another collection</a></p>
+  <p><a class="back-link" href="{{ url_for('browser.index') }}">← Scan another collection</a></p>
 {% endblock %}

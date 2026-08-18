@@ -4,10 +4,10 @@
   <section class="panel">
     <p class="eyebrow">Operation: {{ record.mode.value|upper }}</p>
     {% if record.state == state.QUEUED %}
-      <h1>{{ record.mode.value|upper }} is queued</h1>
+      <div class="section-heading"><span class="heading-icon" aria-hidden="true">⏳</span><h1>{{ record.mode.value|upper }} is queued</h1></div>
       <p class="working" role="status">Waiting for the current COPY to finish…</p>
     {% elif record.state == state.RUNNING %}
-      <h1>Organisation {{ record.mode.value|upper }} is running</h1>
+      <div class="section-heading"><span class="heading-icon" aria-hidden="true">⚙️</span><h1>Organisation {{ record.mode.value|upper }} is running</h1></div>
       <p class="working" role="status">{{ 'Moving' if record.mode == mode.MOVE else 'Copying' }} media. This page refreshes automatically.</p>
       {% if progress %}
         <progress max="{{ progress.total_files }}" value="{{ progress.files_copied }}">{{ progress.files_copied }} / {{ progress.total_files }}</progress>
@@ -17,9 +17,9 @@
           {% if record.mode == mode.MOVE %}<dt>Verified</dt><dd>{{ progress.files_verified }}</dd><dt>Source files deleted</dt><dd>{{ progress.source_files_deleted }}</dd>{% endif %}
         </dl>
       {% endif %}
-      <p>Source files will NOT be deleted.</p>
+      <p>{% if record.mode == mode.MOVE %}Each source is deleted only after its destination is verified.{% else %}Source files will NOT be deleted.{% endif %}</p>
     {% elif record.state == state.COMPLETED %}
-      <h1>{{ 'Partial organisation completed.' if record.capacity.is_partial else 'Organisation ' ~ record.mode.value|upper ~ ' completed' }}</h1>
+      <div class="section-heading"><span class="heading-icon" aria-hidden="true">🎉</span><h1>{{ 'Partial organisation completed.' if record.capacity.is_partial else 'Organisation ' ~ record.mode.value|upper ~ ' completed' }}</h1></div>
       {% if record.capacity.is_partial %}<p>Organised:<br>{{ month_range }}</p>{% endif %}
       <dl class="summary">
         <dt>Files {{ 'moved' if record.mode == mode.MOVE else 'copied' }}</dt><dd>{{ record.result.files_copied }} / {{ record.result.total_files }}</dd>
@@ -29,10 +29,10 @@
       {% if record.mode == mode.COPY %}<p>Source files have not been modified.</p>{% endif %}
       {% if record.capacity.is_partial %}<p>Remaining media was not modified.</p>{% endif %}
     {% elif record.state == state.DECLINED %}
-      <h1>Organisation {{ record.mode.value|upper }} declined</h1>
+      <div class="section-heading"><span class="heading-icon" aria-hidden="true">↩️</span><h1>Organisation {{ record.mode.value|upper }} declined</h1></div>
       <p>No filesystem content has been modified.</p>
     {% elif record.state == state.FAILED %}
-      <h1>{% if record.failure_kind == 'verification' %}Organisation verification failed.{% elif record.failure_kind == 'deletion' %}Source deletion failed after COPY+VERIFY succeeded.{% else %}Organisation execution failed.{% endif %}</h1>
+      <div class="section-heading"><span class="heading-icon" aria-hidden="true">❌</span><h1>{% if record.failure_kind == 'verification' %}Organisation verification failed.{% elif record.failure_kind == 'deletion' %}Source deletion failed after COPY+VERIFY succeeded.{% else %}Organisation execution failed.{% endif %}</h1></div>
       <div class="message error" role="alert">Reason: {{ record.error }}</div>
       {% if record.failed_source %}
         <dl class="summary">
@@ -46,5 +46,5 @@
       <p>Destination may contain successfully completed copies.</p>
     {% endif %}
   </section>
-  <p><a href="{{ url_for('browser.index') }}">Return to the scan form</a></p>
+  <p><a class="back-link" href="{{ url_for('browser.index') }}">← Return to the scan form</a></p>
 {% endblock %}
