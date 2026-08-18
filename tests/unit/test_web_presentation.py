@@ -40,7 +40,7 @@ def test_incomplete_scan_is_prominently_reported_in_deterministic_order(
     page = response.data.decode()
 
     assert "WARNING: Scan is incomplete." in page
-    assert "Scan complete: NO" in page
+    assert "> Incomplete</span>" in page
     assert page.index("a-first") < page.index("z-last")
 
 
