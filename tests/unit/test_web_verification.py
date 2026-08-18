@@ -112,6 +112,7 @@ def test_running_verification_displays_progress_and_cancel_action() -> None:
 
     assert response.status_code == 200
     assert b"Verification is running" in response.data
+    assert b"47% complete" in response.data
     assert b"47 / 100" in response.data
     assert b"47%" in response.data
     assert b"Cache hits</dt><dd>31" in response.data
@@ -138,6 +139,9 @@ def test_completed_verification_displays_classification_totals_and_cache() -> No
     assert b"Unverified Conflicts</dt><dd>0" in response.data
     assert b"Cache hits</dt><dd>2" in response.data
     assert b"Hashed this run</dt><dd>0 B" in response.data
+    assert b"Identical content" in response.data
+    assert b"Needs attention" in response.data
+    assert b"Could not be verified" in response.data
 
 
 def test_verification_displays_only_five_deterministic_examples() -> None:
