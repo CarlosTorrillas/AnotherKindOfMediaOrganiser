@@ -1,11 +1,13 @@
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Event
 
 from another_kind_of_media_organiser.application.capacity_preflight import DEFAULT_SAFETY_RESERVE_BYTES
 from another_kind_of_media_organiser.application.execute_organisation_proposal import (
     OrganisationDeletionError,
     OrganisationExecutionMode,
+    OrganisationExecutionProgress,
     OrganisationVerificationError,
 )
 from another_kind_of_media_organiser.presentation.web import create_app
@@ -129,3 +131,27 @@ def test_partial_move_deletes_only_the_accepted_oldest_month(tmp_path: Path) -> 
     assert not (source / "january.jpg").exists()
     assert (source / "february.jpg").read_bytes() == b"february"
     assert b"Remaining media was not modified." in response.data
+
+
+def test_running_move_displays_verified_deletion_progress(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    _media(source / "photo.jpg", b"valuable")
+    release = Event()
+
+    def controlled(plan, callback, *, mode):
+        callback(OrganisationExecutionProgress(4, 10, 18_4 * 1024**3 // 10, 3, 2))
+        release.wait(timeout=5)
+        return type("Result", (), {"files_copied": 4, "total_files": 10, "bytes_copied": 0, "files_verified": 3, "source_files_deleted": 2})()
+
+    coordinator = _coordinator(executor=controlled)
+    record = coordinator.prepare(source, destination, (), mode=OrganisationExecutionMode.MOVE)
+    coordinator.confirm(record.copy_id, acceptance="move")
+    assert record.started.wait(timeout=2)
+    response = _client(coordinator).get(f"/moves/{record.copy_id}")
+    release.set()
+
+    assert b"Files</dt><dd>4 / 10" in response.data
+    assert b"Moved</dt><dd>18.4 GiB" in response.data
+    assert b"Verified</dt><dd>3" in response.data
+    assert b"Source files deleted</dt><dd>2" in response.data

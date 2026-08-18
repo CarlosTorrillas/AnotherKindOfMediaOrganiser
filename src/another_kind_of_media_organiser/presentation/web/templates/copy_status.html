@@ -2,33 +2,37 @@
 {% block head %}{% if record.is_active %}<meta http-equiv="refresh" content="2">{% endif %}{% endblock %}
 {% block content %}
   <section class="panel">
-    <p class="eyebrow">Operation: COPY</p>
+    <p class="eyebrow">Operation: {{ record.mode.value|upper }}</p>
     {% if record.state == state.QUEUED %}
-      <h1>COPY is queued</h1>
+      <h1>{{ record.mode.value|upper }} is queued</h1>
       <p class="working" role="status">Waiting for the current COPY to finish…</p>
     {% elif record.state == state.RUNNING %}
-      <h1>Organisation COPY is running</h1>
-      <p class="working" role="status">Copying media. This page refreshes automatically.</p>
+      <h1>Organisation {{ record.mode.value|upper }} is running</h1>
+      <p class="working" role="status">{{ 'Moving' if record.mode == mode.MOVE else 'Copying' }} media. This page refreshes automatically.</p>
       {% if progress %}
         <progress max="{{ progress.total_files }}" value="{{ progress.files_copied }}">{{ progress.files_copied }} / {{ progress.total_files }}</progress>
         <dl class="summary">
-          <dt>Files copied</dt><dd>{{ progress.files_copied }} / {{ progress.total_files }}</dd>
-          <dt>Data copied</dt><dd>{{ bytes_copied }}</dd>
+          <dt>{{ 'Files' if record.mode == mode.MOVE else 'Files copied' }}</dt><dd>{{ progress.files_copied }} / {{ progress.total_files }}</dd>
+          <dt>{{ 'Moved' if record.mode == mode.MOVE else 'Data copied' }}</dt><dd>{{ bytes_copied }}</dd>
+          {% if record.mode == mode.MOVE %}<dt>Verified</dt><dd>{{ progress.files_verified }}</dd><dt>Source files deleted</dt><dd>{{ progress.source_files_deleted }}</dd>{% endif %}
         </dl>
       {% endif %}
       <p>Source files will NOT be deleted.</p>
     {% elif record.state == state.COMPLETED %}
-      <h1>Organisation COPY completed</h1>
+      <h1>{{ 'Partial organisation completed.' if record.capacity.is_partial else 'Organisation ' ~ record.mode.value|upper ~ ' completed' }}</h1>
+      {% if record.capacity.is_partial %}<p>Organised:<br>{{ month_range }}</p>{% endif %}
       <dl class="summary">
-        <dt>Files copied</dt><dd>{{ record.result.files_copied }} / {{ record.result.total_files }}</dd>
-        <dt>Data copied</dt><dd>{{ bytes_copied }}</dd>
+        <dt>Files {{ 'moved' if record.mode == mode.MOVE else 'copied' }}</dt><dd>{{ record.result.files_copied }} / {{ record.result.total_files }}</dd>
+        <dt>{{ 'Moved' if record.mode == mode.MOVE else 'Data copied' }}</dt><dd>{{ bytes_copied }}</dd>
+        {% if record.mode == mode.MOVE %}<dt>Verified</dt><dd>{{ record.result.files_verified }}</dd><dt>Source files deleted</dt><dd>{{ record.result.source_files_deleted }}</dd>{% endif %}
       </dl>
-      <p>Source files have not been modified.</p>
+      {% if record.mode == mode.COPY %}<p>Source files have not been modified.</p>{% endif %}
+      {% if record.capacity.is_partial %}<p>Remaining media was not modified.</p>{% endif %}
     {% elif record.state == state.DECLINED %}
-      <h1>Organisation COPY declined</h1>
+      <h1>Organisation {{ record.mode.value|upper }} declined</h1>
       <p>No filesystem content has been modified.</p>
     {% elif record.state == state.FAILED %}
-      <h1>Organisation execution failed.</h1>
+      <h1>{% if record.failure_kind == 'verification' %}Organisation verification failed.{% elif record.failure_kind == 'deletion' %}Source deletion failed after COPY+VERIFY succeeded.{% else %}Organisation execution failed.{% endif %}</h1>
       <div class="message error" role="alert">Reason: {{ record.error }}</div>
       {% if record.failed_source %}
         <dl class="summary">
@@ -37,7 +41,8 @@
           <dt>Files copied</dt><dd>{{ record.files_copied_before_failure }} / {{ record.total_files }}</dd>
         </dl>
       {% endif %}
-      <p>Source files have not been modified.</p>
+      <p>{{ 'The current source file remains.' if record.mode == mode.MOVE else 'Source files have not been modified.' }}</p>
+      {% if record.failure_kind == 'deletion' %}<p>Verified destination remains. Source remains.</p>{% endif %}
       <p>Destination may contain successfully completed copies.</p>
     {% endif %}
   </section>

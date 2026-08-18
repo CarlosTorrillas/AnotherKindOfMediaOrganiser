@@ -1,4 +1,4 @@
-"""Browser coordination around existing capacity and COPY workflows."""
+"""Browser coordination around existing capacity and organisation workflows."""
 
 import queue
 import threading
@@ -14,9 +14,12 @@ from another_kind_of_media_organiser.application.capacity_preflight import (
 )
 from another_kind_of_media_organiser.application.execute_organisation_proposal import (
     OrganisationCopyError,
+    OrganisationDeletionError,
+    OrganisationExecutionMode,
     OrganisationExecutionPlan,
     OrganisationExecutionProgress,
     OrganisationExecutionResult,
+    OrganisationVerificationError,
     execute_organisation_plan,
     prepare_organisation_execution,
 )
@@ -43,12 +46,13 @@ class CopyState(Enum):
 
 @dataclass
 class CopyRecord:
-    """One read-only preflight and, if accepted, its single COPY execution."""
+    """One read-only preflight and, if accepted, its single execution."""
 
     copy_id: str
     source: Path
     destination: Path
     exclusions: tuple[Path, ...]
+    mode: OrganisationExecutionMode
     capacity: CapacityPreflight
     plan: OrganisationExecutionPlan | None
     state: CopyState = CopyState.AWAITING_CONFIRMATION
@@ -59,6 +63,7 @@ class CopyRecord:
     failed_destination: Path | None = None
     files_copied_before_failure: int = 0
     total_files: int = 0
+    failure_kind: str | None = None
     started: threading.Event = field(default_factory=threading.Event, repr=False)
     finished: threading.Event = field(default_factory=threading.Event, repr=False)
 
@@ -77,7 +82,7 @@ class IncompleteScanError(ValueError):
 
 
 class CopyCoordinator:
-    """Prepare without writing, then execute each accepted COPY at most once."""
+    """Prepare without writing, then execute each accepted operation at most once."""
 
     def __init__(
         self,
@@ -99,6 +104,8 @@ class CopyCoordinator:
         source: Path,
         destination: Path,
         exclusions: tuple[Path, ...],
+        *,
+        mode: OrganisationExecutionMode = OrganisationExecutionMode.COPY,
     ) -> CopyRecord:
         result = (
             scan_media_collection(source, excluded_paths=exclusions)
@@ -125,6 +132,7 @@ class CopyCoordinator:
             source,
             destination,
             exclusions,
+            mode,
             capacity,
             plan,
             total_files=len(plan.items) if plan else 0,
@@ -146,7 +154,10 @@ class CopyCoordinator:
                 return None
             if record.state is not CopyState.AWAITING_CONFIRMATION:
                 return record
-            expected = "partial-copy" if record.capacity.is_partial else "copy"
+            operation = record.mode.value
+            expected = (
+                f"partial-{operation}" if record.capacity.is_partial else operation
+            )
             if record.plan is None or acceptance != expected:
                 return None
             record.state = CopyState.QUEUED
@@ -201,7 +212,7 @@ class CopyCoordinator:
             return
         self._worker = threading.Thread(
             target=self._work,
-            name="media-organiser-copy",
+            name="media-organiser-execution",
             daemon=True,
         )
         self._worker.start()
@@ -224,20 +235,38 @@ class CopyCoordinator:
         record.state = CopyState.RUNNING
         record.started.set()
         try:
-            record.result = self._executor(plan, self._reporter(record))
+            if record.mode is OrganisationExecutionMode.MOVE:
+                record.result = self._executor(
+                    plan,
+                    self._reporter(record),
+                    mode=OrganisationExecutionMode.MOVE,
+                )
+            else:
+                record.result = self._executor(plan, self._reporter(record))
             record.state = CopyState.COMPLETED
+        except OrganisationVerificationError as error:
+            self._record_failure(record, error, "verification")
+        except OrganisationDeletionError as error:
+            self._record_failure(record, error, "deletion")
         except OrganisationCopyError as error:
-            record.error = _safe_error_message(error.cause)
-            record.failed_source = error.source
-            record.failed_destination = error.destination
-            record.files_copied_before_failure = error.files_copied
-            record.total_files = error.total_files
-            record.state = CopyState.FAILED
+            self._record_failure(record, error, "copy")
         except Exception as error:
             record.error = _safe_error_message(error)
             record.state = CopyState.FAILED
         finally:
             record.finished.set()
+
+    @staticmethod
+    def _record_failure(
+        record: CopyRecord, error: OrganisationCopyError, kind: str
+    ) -> None:
+        record.error = _safe_error_message(error.cause)
+        record.failed_source = error.source
+        record.failed_destination = error.destination
+        record.files_copied_before_failure = error.files_copied
+        record.total_files = error.total_files
+        record.failure_kind = kind
+        record.state = CopyState.FAILED
 
     @staticmethod
     def _reporter(record: CopyRecord):

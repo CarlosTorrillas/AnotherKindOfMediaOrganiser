@@ -72,6 +72,18 @@
         <button type="submit">Run Capacity Preflight</button>
         <p class="working" role="status" aria-live="polite" hidden data-working>Checking destination capacity…</p>
       </form>
+      <div class="danger-zone">
+        <h2>Organise by verified MOVE</h2>
+        <p>MOVE deletes each source only after its destination copy has been verified.</p>
+        <form method="post" action="{{ url_for('browser.start_move_preflight') }}" data-submission-form>
+          <input type="hidden" name="source" value="{{ source }}">
+          {% for exclusion in exclusions %}<input type="hidden" name="exclude" value="{{ exclusion }}">{% endfor %}
+          <label for="move-destination">Destination Collection path for MOVE</label>
+          <input id="move-destination" name="destination" type="text" required placeholder="/Volumes/OrganisedMedia">
+          <button class="danger" type="submit">Review MOVE safety</button>
+          <p class="working" role="status" aria-live="polite" hidden data-working>Checking MOVE capacity and safety…</p>
+        </form>
+      </div>
     </section>
   {% else %}
     <form method="post" action="{{ url_for('browser.proposal') }}" data-submission-form>
