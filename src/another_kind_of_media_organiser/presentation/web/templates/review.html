@@ -10,16 +10,18 @@
   <section class="panel">
     <p class="eyebrow">{{ source }}</p>
     <div class="section-heading"><span class="heading-icon" aria-hidden="true">🔎</span><div><h1>Scan Result</h1><p>Your collection at a glance.</p></div></div>
-    <dl class="summary overview-summary">
-      <dt>Total files</dt><dd>{{ result.total_files }}</dd>
-      <dt>Recognised media</dt><dd>{{ result.media_files }}</dd>
-      <dt>Images</dt><dd>{{ result.counts_by_category[MediaCategory.IMAGE] }}</dd>
-      <dt>RAW</dt><dd>{{ result.counts_by_category[MediaCategory.RAW] }}</dd>
-      <dt>Videos</dt><dd>{{ result.counts_by_category[MediaCategory.VIDEO] }}</dd>
-      <dt>Audio</dt><dd>{{ result.counts_by_category[MediaCategory.AUDIO] }}</dd>
+    <div class="metric-grid" aria-label="Principal scan metrics">
+      <article class="metric-card"><span aria-hidden="true">📚</span><strong>{{ result.total_files }}</strong><small>Total files</small></article>
+      <article class="metric-card featured"><span aria-hidden="true">✓</span><strong>{{ result.media_files }}</strong><small>Recognised media</small></article>
+      <article class="metric-card"><span aria-hidden="true">🖼️</span><strong>{{ result.counts_by_category[MediaCategory.IMAGE] }}</strong><small>Images</small></article>
+      <article class="metric-card"><span aria-hidden="true">◐</span><strong>{{ result.counts_by_category[MediaCategory.RAW] }}</strong><small>RAW</small></article>
+      <article class="metric-card"><span aria-hidden="true">🎬</span><strong>{{ result.counts_by_category[MediaCategory.VIDEO] }}</strong><small>Videos</small></article>
+      <article class="metric-card"><span aria-hidden="true">🎧</span><strong>{{ result.counts_by_category[MediaCategory.AUDIO] }}</strong><small>Audio</small></article>
+    </div>
+    <dl class="summary overview-summary supporting-summary">
       <dt>Unsupported files</dt><dd>{{ result.unsupported_files }}</dd>
       <dt>Directories scanned</dt><dd>{{ result.directories_scanned }}</dd>
-      <dt>Status</dt><dd><span class="status-pill {{ 'success' if result.is_complete else 'caution' }}">Scan complete: {{ "YES" if result.is_complete else "NO" }}</span></dd>
+      <dt>Scan status</dt><dd><span class="status-pill {{ 'success' if result.is_complete else 'caution' }}"><span aria-hidden="true">{{ '✓' if result.is_complete else '!' }}</span> {{ "Complete" if result.is_complete else "Incomplete" }}</span></dd>
       <dt>Excluded paths</dt><dd>{{ excluded|length }}</dd>
       <dt>Inaccessible paths</dt><dd>{{ inaccessible|length }}</dd>
     </dl>
@@ -38,20 +40,23 @@
     <section class="panel">
       <p class="eyebrow">Read-only plan</p>
       <div class="section-heading"><span class="heading-icon" aria-hidden="true">✨</span><div><h1>Organisation Proposal</h1><p>No files have been changed.</p></div></div>
-      <dl class="summary overview-summary">
-        <dt>Media files</dt><dd>{{ proposal.placements|length }}</dd>
-        <dt>Proposed destinations</dt><dd>{{ proposal.placements|length }}</dd>
-        <dt>Destination collisions</dt><dd>{{ proposal.collision_destinations|length }}</dd>
-        <dt>Name Conflict files</dt><dd>{{ proposal.name_conflict_files }}</dd>
-      </dl>
+      <div class="metric-grid proposal-metrics" aria-label="Organisation Proposal metrics">
+        <article class="metric-card featured"><span aria-hidden="true">📷</span><strong>{{ proposal.placements|length }}</strong><small>Media files</small></article>
+        <article class="metric-card"><span aria-hidden="true">📁</span><strong>{{ proposal.placements|length }}</strong><small>Proposed destinations</small></article>
+        <article class="metric-card attention"><span aria-hidden="true">◇</span><strong>{{ proposal.collision_destinations|length }}</strong><small>Destination collisions</small></article>
+        <article class="metric-card attention"><span aria-hidden="true">!</span><strong>{{ proposal.name_conflict_files }}</strong><small>Name Conflict files</small></article>
+      </div>
       <h2>Years</h2>
-      <ul>{% for year, count in year_counts %}<li>{{ year }}: {{ count }}</li>{% else %}<li>No recognised media.</li>{% endfor %}</ul>
+      <div class="year-grid" aria-label="Media by year">
+        {% for year, count in year_counts %}<article class="year-card"><strong>{{ year }}</strong><span>{{ count }} media file{{ '' if count == 1 else 's' }}</span></article>{% else %}<p>No recognised media.</p>{% endfor %}
+      </div>
       {% if collisions %}
         <h2>Collision examples</h2>
         {% for destination, placements in collisions %}
           <article class="collision">
-            <h3>{{ destination }}</h3>
-            <ul>{% for placement in placements %}<li><strong>{{ placement.classification.value|replace('_', ' ')|title }}:</strong> {{ placement.source.path }}</li>{% endfor %}</ul>
+            <p class="collision-label">Proposed destination</p>
+            <h3 class="path">{{ destination }}</h3>
+            <ul class="collision-files">{% for placement in placements %}<li><span class="classification-badge classification-{{ placement.classification.value|lower|replace('_', '-') }}">{{ placement.classification.value|replace('_', ' ')|title }}</span><span class="path">{{ placement.source.path }}</span></li>{% endfor %}</ul>
           </article>
         {% endfor %}
         <p>Showing {{ collisions|length }} of {{ collision_total }} collisions</p>
@@ -65,8 +70,10 @@
       <div class="action-grid">
       <section class="action-card copy-card">
       <span class="action-icon" aria-hidden="true">📋</span>
+      <span class="recommended-badge">Recommended safer option</span>
       <h2>Organise by COPY</h2>
       <p>Create an organised collection while keeping every source file untouched.</p>
+      <p class="safety-statement"><strong>✓ Source files remain untouched.</strong></p>
       <form method="post" action="{{ url_for('browser.start_copy_preflight') }}" data-submission-form>
         <input type="hidden" name="source" value="{{ source }}">
         {% for exclusion in exclusions %}<input type="hidden" name="exclude" value="{{ exclusion }}">{% endfor %}
@@ -78,7 +85,8 @@
       <section class="danger-zone action-card">
         <span class="action-icon" aria-hidden="true">⚠️</span>
         <h2>Organise by verified MOVE</h2>
-        <p>MOVE deletes each source only after its destination copy has been verified.</p>
+        <p>MOVE is intentionally cautious and separate from COPY.</p>
+        <p class="safety-statement"><strong>Sources are deleted only after the destination copy has been verified.</strong></p>
         <form method="post" action="{{ url_for('browser.start_move_preflight') }}" data-submission-form>
           <input type="hidden" name="source" value="{{ source }}">
           {% for exclusion in exclusions %}<input type="hidden" name="exclude" value="{{ exclusion }}">{% endfor %}

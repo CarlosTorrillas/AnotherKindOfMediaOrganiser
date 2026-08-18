@@ -10,9 +10,12 @@
       <div class="section-heading"><span class="heading-icon" aria-hidden="true">🔬</span><h1>Verification is running</h1></div>
       <p class="working" role="status">Deeply verifying destination collisions. This page refreshes automatically.</p>
       {% if progress %}
-        <progress max="{{ progress.total_candidates }}" value="{{ progress.processed_candidates }}">{{ percentage }}%</progress>
-        <p>{{ progress.processed_candidates }} / {{ progress.total_candidates }} candidates ({{ percentage }}%)</p>
-        <dl class="summary">
+        <div class="progress-focus">
+          <div class="progress-heading"><strong>{{ percentage }}% complete</strong><span>{{ progress.processed_candidates }} / {{ progress.total_candidates }} candidates</span></div>
+          <progress max="{{ progress.total_candidates }}" value="{{ progress.processed_candidates }}">{{ percentage }}%</progress>
+          <p>The verification is still running.</p>
+        </div>
+        <dl class="summary overview-summary verification-summary">
           <dt>Exact Duplicates</dt><dd>{{ progress.exact_duplicate_files }}</dd>
           <dt>Potential Conflicts</dt><dd>{{ progress.potential_conflict_files }}</dd>
           <dt>Unverified Conflicts</dt><dd>{{ progress.unverified_conflict_files }}</dd>
@@ -37,7 +40,12 @@
         <div class="message warning" role="alert"><strong>WARNING: Scan is incomplete.</strong> Verification covers accessible media only.</div>
       {% endif %}
       <p>No files have been changed.</p>
-      <dl class="summary">
+      <div class="classification-summary">
+        <article class="result-card duplicate-result"><span class="classification-badge classification-exact-duplicate">Exact Duplicates</span><strong>{{ proposal.exact_duplicate_files }}</strong><small>Identical content</small></article>
+        <article class="result-card conflict-result"><span class="classification-badge classification-potential-conflict">Potential Conflicts</span><strong>{{ proposal.potential_conflict_files }}</strong><small>Needs attention</small></article>
+        <article class="result-card unverified-result"><span class="classification-badge classification-unverified-conflict">Unverified Conflicts</span><strong>{{ proposal.unverified_conflict_files }}</strong><small>Could not be verified</small></article>
+      </div>
+      <dl class="summary overview-summary supporting-summary">
         <dt>Destination Collisions</dt><dd>{{ proposal.collision_destinations|length }}</dd>
         <dt>Exact Duplicates</dt><dd>{{ proposal.exact_duplicate_files }}</dd>
         <dt>Potential Conflicts</dt><dd>{{ proposal.potential_conflict_files }}</dd>
@@ -49,8 +57,9 @@
         <h2>Verification examples</h2>
         {% for destination, placements in collisions %}
           <article class="collision">
-            <h3>{{ destination }}</h3>
-            <ul>{% for placement in placements %}<li><strong>{{ placement.classification.value|replace('_', ' ')|title }}:</strong> {{ placement.source.path }}</li>{% endfor %}</ul>
+            <p class="collision-label">Proposed destination</p>
+            <h3 class="path">{{ destination }}</h3>
+            <ul class="collision-files">{% for placement in placements %}<li><span class="classification-badge classification-{{ placement.classification.value|lower|replace('_', '-') }}">{{ placement.classification.value|replace('_', ' ')|title }}</span><span class="path">{{ placement.source.path }}</span></li>{% endfor %}</ul>
           </article>
         {% endfor %}
         <p>Showing {{ collisions|length }} of {{ collision_total }} collisions</p>

@@ -82,7 +82,7 @@ def step_scan_result(context):
 
 @then("the browser scan is reported as complete")
 def step_complete(context):
-    assert b"Scan complete: YES" in context.response.data
+    assert b"> Complete</span>" in context.response.data
 
 
 @then("recognised and unsupported media counts are shown")
@@ -118,7 +118,7 @@ def step_excluded_reported(context):
 
 @then("excluded media is not included in the Scan Result")
 def step_excluded_not_scanned(context):
-    assert b"Recognised media</dt><dd>1" in context.response.data
+    assert b"<strong>1</strong><small>Recognised media</small>" in context.response.data
 
 
 @then("the excluded path is not reported as inaccessible")
@@ -153,7 +153,7 @@ def step_display_incomplete(context):
 
 @then("the browser scan is reported as incomplete")
 def step_report_incomplete(context):
-    assert b"Scan complete: NO" in context.response.data
+    assert b"> Incomplete</span>" in context.response.data
 
 
 @then("a prominent incomplete-scan warning is displayed")
@@ -218,12 +218,12 @@ def step_show_collision_proposal(context):
 
 @then("the destination collision count is shown")
 def step_collision_count(context):
-    assert b"Destination collisions</dt><dd>1" in context.response.data
+    assert b"<strong>1</strong><small>Destination collisions</small>" in context.response.data
 
 
 @then("the Name Conflict file count is shown")
 def step_name_conflict_count(context):
-    assert b"Name Conflict files</dt><dd>1" in context.response.data
+    assert b"<strong>1</strong><small>Name Conflict files</small>" in context.response.data
 
 
 @then("deterministic collision examples are displayed")

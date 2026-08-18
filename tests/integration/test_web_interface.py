@@ -37,7 +37,7 @@ def test_complete_scan_displays_counts_and_proposal_action(client, tmp_path: Pat
 
     assert response.status_code == 200
     assert b"Scan Result" in response.data
-    assert b">Complete<" in response.data
+    assert b"> Complete</span>" in response.data
     assert b"Recognised media" in response.data
     assert b"Unsupported files" in response.data
     assert b"Directories scanned" in response.data
@@ -52,7 +52,7 @@ def test_exclusions_are_reported_and_media_is_not_scanned(client, tmp_path: Path
         "/scan", data={"source": str(tmp_path), "exclude": "archive"}
     )
 
-    assert b"Recognised media</dt><dd>1" in response.data
+    assert b"<strong>1</strong><small>Recognised media</small>" in response.data
     assert b"Excluded paths</dt><dd>1" in response.data
     assert b"archive" in response.data
     assert b"Inaccessible paths</dt><dd>0" in response.data
@@ -66,8 +66,8 @@ def test_proposal_displays_deterministic_name_conflicts(client, tmp_path: Path) 
 
     assert response.status_code == 200
     assert b"Organisation Proposal" in response.data
-    assert b"Destination collisions</dt><dd>1" in response.data
-    assert b"Name Conflict files</dt><dd>1" in response.data
+    assert b"<strong>1</strong><small>Destination collisions</small>" in response.data
+    assert b"<strong>1</strong><small>Name Conflict files</small>" in response.data
     assert b"2025/02-February/IMAGE/IMG_001.jpg" in response.data
     assert b"camera-a" in response.data
     assert b"camera-b" in response.data
