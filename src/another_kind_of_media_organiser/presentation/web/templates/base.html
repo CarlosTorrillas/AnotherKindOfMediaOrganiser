@@ -9,7 +9,17 @@
     {% block head %}{% endblock %}
   </head>
   <body>
-    <header><a href="{{ url_for('browser.index') }}">AnotherKindOfMediaOrganiser</a></header>
+    <header class="site-header">
+      <a class="brand" href="{{ url_for('browser.index') }}">
+        <span class="brand-mark" aria-hidden="true">◈</span>
+        <span>
+          <strong>AnotherKindOf</strong>
+          <small>Media Organiser</small>
+        </span>
+      </a>
+      <span class="safety-badge">🛡️ Safety first</span>
+    </header>
     <main>{% block content %}{% endblock %}</main>
+    <footer>Built for careful, non-destructive media organisation.</footer>
   </body>
 </html>

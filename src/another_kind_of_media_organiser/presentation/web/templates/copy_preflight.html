@@ -2,7 +2,7 @@
 {% block content %}
   <section class="panel">
     <p class="eyebrow">Read-only safety check</p>
-    <h1>Capacity Preflight</h1>
+    <div class="section-heading"><span class="heading-icon" aria-hidden="true">📊</span><div><h1>Capacity Preflight</h1><p>Confirm the destination has room before anything is written.</p></div></div>
     {% if capacity.is_partial %}
       <div class="message warning" role="alert"><strong>Full organisation does not fit.</strong></div>
       <h2>Proposed partial organisation</h2>
@@ -19,7 +19,7 @@
       <dt>Estimated remaining space</dt><dd>{{ estimated_remaining }}</dd>
     </dl>
     {% if capacity.execution_proposal is not none %}
-      <h2>Confirm Organisation Execution</h2>
+      <h2>{{ '⚠️' if record.mode == mode.MOVE else '✅' }} Confirm Organisation Execution</h2>
       <dl class="summary">
         <dt>Operation</dt><dd>{{ record.mode.value|upper }}</dd>
         <dt>Source</dt><dd>{{ record.source }}</dd>
@@ -36,11 +36,11 @@
       <form method="post" action="{{ url_for('browser.decide_move' if record.mode == mode.MOVE else 'browser.decide_copy', copy_id=record.copy_id) }}">
         <input type="hidden" name="decision" value="confirm">
         <label><input class="inline" type="checkbox" name="acceptance" value="{{ ('partial-' if capacity.is_partial else '') ~ record.mode.value }}" required> I explicitly accept this {{ 'partial ' if capacity.is_partial }}{{ record.mode.value|upper }}.</label>
-        <button class="{{ 'danger' if record.mode == mode.MOVE }}" type="submit">Confirm {{ record.mode.value|upper }}</button>
+        <button class="{{ 'danger' if record.mode == mode.MOVE }}" type="submit">{{ '⚠️' if record.mode == mode.MOVE else '✓' }} Confirm {{ record.mode.value|upper }}</button>
       </form>
       <form method="post" action="{{ url_for('browser.decide_move' if record.mode == mode.MOVE else 'browser.decide_copy', copy_id=record.copy_id) }}">
         <input type="hidden" name="decision" value="decline">
-        <button class="secondary" type="submit">Decline</button>
+        <button class="secondary" type="submit">← Decline</button>
       </form>
     {% endif %}
     <p>No filesystem content has been modified.</p>

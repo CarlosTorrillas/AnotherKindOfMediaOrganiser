@@ -1,23 +1,31 @@
 {% extends "base.html" %}
 {% block content %}
-  <section class="panel">
-    <p class="eyebrow">Read-only browser interface</p>
-    <h1>Review a Media Collection</h1>
-    <p>Scan media and generate a lightweight organisation proposal. No files will be changed.</p>
+  <section class="panel hero-panel">
+    <div class="hero-icon" aria-hidden="true">🗂️</div>
+    <p class="eyebrow">READ-ONLY WORKSPACE</p>
+    <h1>Bring order to your media.</h1>
+    <p class="lead">Scan a collection, understand what is inside, and build a safe organisation proposal—all before changing a single file.</p>
+    <div class="trust-row">
+      <span>✓ No changes during scan</span>
+      <span>✓ Explicit confirmation</span>
+      <span>✓ Verified operations</span>
+    </div>
     {% if error %}<div class="message error" role="alert"><strong>Unable to scan.</strong> {{ error }}</div>{% endif %}
-    <form method="post" action="{{ url_for('browser.scan') }}" data-submission-form>
-      <label for="source">Media Collection path</label>
-      <input id="source" name="source" type="text" required value="{{ source }}" placeholder="/Volumes/MyMedia">
+    <form class="scan-form" method="post" action="{{ url_for('browser.scan') }}" data-submission-form>
+      <label for="source"><span aria-hidden="true">📁</span> Media Collection path</label>
+      <input id="source" name="source" type="text" required value="{{ source }}" placeholder="/Volumes/MyMedia" autofocus>
       <fieldset data-exclusions>
-        <legend>Relative exclusions <span>(optional)</span></legend>
+        <legend><span aria-hidden="true">🚫</span> Relative exclusions <span class="optional">optional</span></legend>
         {% for exclusion in exclusions %}
           <input name="exclude" type="text" value="{{ exclusion }}">
         {% else %}
           <input name="exclude" type="text" placeholder="old-backup">
         {% endfor %}
       </fieldset>
-      <button type="button" class="secondary" data-add-exclusion>Add another exclusion</button>
-      <button type="submit">Start scan</button>
+      <div class="form-actions">
+        <button type="button" class="secondary" data-add-exclusion>＋ Add exclusion</button>
+        <button type="submit">Start scan <span aria-hidden="true">→</span></button>
+      </div>
       <p class="working" role="status" aria-live="polite" hidden data-working>Scanning… Large collections may take some time.</p>
     </form>
   </section>
