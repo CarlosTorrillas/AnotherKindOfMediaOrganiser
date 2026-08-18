@@ -223,18 +223,23 @@ def step_remaining_source(context):
 @given("browser MOVE execution is already running")
 def step_move_running(context):
     context.release = Event()
+    context.progress_reported = Event()
     context.add_cleanup(context.release.set)
     context.calls = 0
+
     def controlled(plan, callback, *, mode):
         context.calls += 1
         callback(OrganisationExecutionProgress(0, 1, 0, 0, 0))
+        context.progress_reported.set()
         context.release.wait(timeout=5)
         return type("Result", (), {"files_copied": 0, "total_files": 1, "bytes_copied": 0, "files_verified": 0, "source_files_deleted": 0})()
+
     _setup(context, executor=controlled)
     _media(context.source / "photo.jpg", b"valuable")
     _prepare(context)
     context.coordinator.confirm(context.record.copy_id, acceptance="move")
     assert context.record.started.wait(timeout=2)
+    assert context.progress_reported.wait(timeout=2)
 
 
 @when("the browser reconnects to MOVE progress")
