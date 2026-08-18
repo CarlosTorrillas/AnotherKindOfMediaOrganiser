@@ -63,6 +63,14 @@ background COPY worker provides a reconnectable progress/result page and
 prevents confirmation replay from starting duplicate execution. Browser COPY
 never invokes MOVE and never deletes source media.
 
+Verified MOVE is available as a separate, visually distinct browser action and
+is never the default. Its stronger confirmation states that source files will
+be deleted and remains unchecked by default. After confirmation, the same
+single execution queue invokes the existing MOVE mode, which alone enforces
+`COPY → VERIFY → DELETE SOURCE`. Progress reports copied bytes, verified files,
+and deleted sources. Verification or deletion failures preserve the current
+source; completed verified moves remain completed without rollback.
+
 The server binds only to localhost by default and does not use authentication.
 A non-local bind such as `--host 0.0.0.0` must be explicit and displays a
 warning because it makes the interface available beyond the current computer.

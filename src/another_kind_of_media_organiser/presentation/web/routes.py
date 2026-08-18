@@ -24,6 +24,9 @@ from another_kind_of_media_organiser.presentation.web.copy_jobs import (
     CopyRecord,
     CopyState,
 )
+from another_kind_of_media_organiser.application.execute_organisation_proposal import (
+    OrganisationExecutionMode,
+)
 
 
 browser = Blueprint("browser", __name__)
@@ -95,6 +98,17 @@ def cancel_verification(job_id: str) -> tuple[str, int]:
 
 @browser.post("/copy-preflights")
 def start_copy_preflight() -> tuple[str, int] | str:
+    return _start_execution_preflight(OrganisationExecutionMode.COPY)
+
+
+@browser.post("/move-preflights")
+def start_move_preflight() -> tuple[str, int] | str:
+    return _start_execution_preflight(OrganisationExecutionMode.MOVE)
+
+
+def _start_execution_preflight(
+    mode: OrganisationExecutionMode,
+) -> tuple[str, int] | str:
     prepared = _prepare_submission()
     if _is_error_response(prepared):
         return prepared
@@ -108,7 +122,7 @@ def start_copy_preflight() -> tuple[str, int] | str:
         )
     try:
         record = _copy_coordinator().prepare(
-            source, Path(destination_value), exclusions
+            source, Path(destination_value), exclusions, mode=mode
         )
     except (OSError, ValueError) as error:
         return (
@@ -121,21 +135,49 @@ def start_copy_preflight() -> tuple[str, int] | str:
             400,
         )
     return redirect(
-        url_for("browser.copy_preflight", copy_id=record.copy_id), code=303
+        url_for(
+            "browser.move_preflight"
+            if mode is OrganisationExecutionMode.MOVE
+            else "browser.copy_preflight",
+            copy_id=record.copy_id,
+        ),
+        code=303,
     )
 
 
 @browser.get("/copy-preflights/<copy_id>")
 def copy_preflight(copy_id: str) -> str:
     record = _copy_coordinator().get(copy_id)
-    if record is None:
+    if record is None or record.mode is not OrganisationExecutionMode.COPY:
+        abort(404)
+    return _render_copy_preflight(record)
+
+
+@browser.get("/move-preflights/<copy_id>")
+def move_preflight(copy_id: str) -> str:
+    record = _copy_coordinator().get(copy_id)
+    if record is None or record.mode is not OrganisationExecutionMode.MOVE:
         abort(404)
     return _render_copy_preflight(record)
 
 
 @browser.post("/copy-preflights/<copy_id>/decision")
 def decide_copy(copy_id: str) -> tuple[str, int]:
+    return _decide_execution(copy_id, OrganisationExecutionMode.COPY)
+
+
+@browser.post("/move-preflights/<copy_id>/decision")
+def decide_move(copy_id: str) -> tuple[str, int]:
+    return _decide_execution(copy_id, OrganisationExecutionMode.MOVE)
+
+
+def _decide_execution(
+    copy_id: str, mode: OrganisationExecutionMode
+) -> tuple[str, int]:
     coordinator = _copy_coordinator()
+    existing = coordinator.get(copy_id)
+    if existing is None or existing.mode is not mode:
+        abort(404)
     if request.form.get("decision") == "confirm":
         record = coordinator.confirm(
             copy_id, acceptance=request.form.get("acceptance", "")
@@ -146,13 +188,26 @@ def decide_copy(copy_id: str) -> tuple[str, int]:
         record = coordinator.decline(copy_id)
     if record is None:
         abort(404)
-    return redirect(url_for("browser.copy_status", copy_id=copy_id), code=303)
+    endpoint = (
+        "browser.move_status"
+        if mode is OrganisationExecutionMode.MOVE
+        else "browser.copy_status"
+    )
+    return redirect(url_for(endpoint, copy_id=copy_id), code=303)
 
 
 @browser.get("/copies/<copy_id>")
 def copy_status(copy_id: str) -> str:
     record = _copy_coordinator().get(copy_id)
-    if record is None:
+    if record is None or record.mode is not OrganisationExecutionMode.COPY:
+        abort(404)
+    return _render_copy_status(record)
+
+
+@browser.get("/moves/<copy_id>")
+def move_status(copy_id: str) -> str:
+    record = _copy_coordinator().get(copy_id)
+    if record is None or record.mode is not OrganisationExecutionMode.MOVE:
         abort(404)
     return _render_copy_status(record)
 
@@ -355,6 +410,10 @@ def _render_copy_preflight(record: CopyRecord) -> str:
             if capacity.included_months
             else None
         ),
+        execution_data=_format_bytes(
+            sum(group.logical_bytes for group in capacity.included_groups)
+        ),
+        mode=OrganisationExecutionMode,
     )
 
 
@@ -368,6 +427,12 @@ def _render_copy_status(record: CopyRecord) -> str:
         bytes_copied=(
             _format_bytes(progress.bytes_copied) if progress else "0 B"
         ),
+        month_range=(
+            _format_month_range(record.capacity.included_months)
+            if record.capacity.included_months
+            else None
+        ),
+        mode=OrganisationExecutionMode,
     )
 
 

@@ -21,20 +21,24 @@
     {% if capacity.execution_proposal is not none %}
       <h2>Confirm Organisation Execution</h2>
       <dl class="summary">
-        <dt>Operation</dt><dd>COPY</dd>
+        <dt>Operation</dt><dd>{{ record.mode.value|upper }}</dd>
         <dt>Source</dt><dd>{{ record.source }}</dd>
         <dt>Destination</dt><dd>{{ record.destination }}</dd>
-        <dt>Files</dt><dd>{{ record.plan.items|length }}</dd>
+        <dt>{{ 'Files to move' if record.mode == mode.MOVE else 'Files' }}</dt><dd>{{ record.plan.items|length }}</dd>
+        {% if record.mode == mode.MOVE %}<dt>Data to move</dt><dd>{{ execution_data }}</dd>{% endif %}
         <dt>Required space</dt><dd>{{ execution_required }}</dd>
       </dl>
-      <p><strong>Source files will NOT be deleted.</strong></p>
+      {% if record.mode == mode.MOVE %}
+        <p>Each file will be copied and verified before its original source file is deleted.</p>
+        <div class="message danger-message" role="alert"><strong>THIS OPERATION WILL DELETE SOURCE FILES.</strong></div>
+      {% else %}<p><strong>Source files will NOT be deleted.</strong></p>{% endif %}
       <p>Continue? The default is NO.</p>
-      <form method="post" action="{{ url_for('browser.decide_copy', copy_id=record.copy_id) }}">
+      <form method="post" action="{{ url_for('browser.decide_move' if record.mode == mode.MOVE else 'browser.decide_copy', copy_id=record.copy_id) }}">
         <input type="hidden" name="decision" value="confirm">
-        <label><input class="inline" type="checkbox" name="acceptance" value="{{ 'partial-copy' if capacity.is_partial else 'copy' }}" required> I explicitly accept this {{ 'partial ' if capacity.is_partial }}COPY.</label>
-        <button type="submit">Confirm COPY</button>
+        <label><input class="inline" type="checkbox" name="acceptance" value="{{ ('partial-' if capacity.is_partial else '') ~ record.mode.value }}" required> I explicitly accept this {{ 'partial ' if capacity.is_partial }}{{ record.mode.value|upper }}.</label>
+        <button class="{{ 'danger' if record.mode == mode.MOVE }}" type="submit">Confirm {{ record.mode.value|upper }}</button>
       </form>
-      <form method="post" action="{{ url_for('browser.decide_copy', copy_id=record.copy_id) }}">
+      <form method="post" action="{{ url_for('browser.decide_move' if record.mode == mode.MOVE else 'browser.decide_copy', copy_id=record.copy_id) }}">
         <input type="hidden" name="decision" value="decline">
         <button class="secondary" type="submit">Decline</button>
       </form>
