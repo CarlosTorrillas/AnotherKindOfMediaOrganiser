@@ -414,6 +414,7 @@ def _render_copy_preflight(record: CopyRecord) -> str:
             sum(group.logical_bytes for group in capacity.included_groups)
         ),
         mode=OrganisationExecutionMode,
+        inaccessible_examples=record.inaccessible_paths[:_MAX_PATH_EXAMPLES],
     )
 
 
@@ -433,6 +434,7 @@ def _render_copy_status(record: CopyRecord) -> str:
             else None
         ),
         mode=OrganisationExecutionMode,
+        inaccessible_examples=record.inaccessible_paths[:_MAX_PATH_EXAMPLES],
     )
 
 

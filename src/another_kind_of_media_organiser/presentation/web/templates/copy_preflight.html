@@ -32,10 +32,20 @@
         <p>Each file will be copied and verified before its original source file is deleted.</p>
         <div class="message danger-message" role="alert"><strong>THIS OPERATION WILL DELETE SOURCE FILES.</strong></div>
       {% else %}<p><strong>Source files will NOT be deleted.</strong></p>{% endif %}
+      {% if record.inaccessible_paths %}
+        <div class="message warning" role="alert">
+          <strong>Some files or folders cannot be accessed.</strong>
+          The {{ record.mode.value|upper }} operation will be incomplete.
+        </div>
+        <p>{{ record.inaccessible_paths|length }} inaccessible path{{ '' if record.inaccessible_paths|length == 1 else 's' }} will be skipped and left untouched.</p>
+        <ul>{% for item in inaccessible_examples %}<li>{{ item.path }} ({{ item.reason }})</li>{% endfor %}</ul>
+        {% if record.inaccessible_paths|length > inaccessible_examples|length %}<p>Showing {{ inaccessible_examples|length }} of {{ record.inaccessible_paths|length }} inaccessible paths.</p>{% endif %}
+        <p><strong>Do you want to continue and organise the accessible media?</strong></p>
+      {% endif %}
       <p>Continue? The default is NO.</p>
       <form method="post" action="{{ url_for('browser.decide_move' if record.mode == mode.MOVE else 'browser.decide_copy', copy_id=record.copy_id) }}">
         <input type="hidden" name="decision" value="confirm">
-        <label><input class="inline" type="checkbox" name="acceptance" value="{{ ('partial-' if capacity.is_partial else '') ~ record.mode.value }}" required> I explicitly accept this {{ 'partial ' if capacity.is_partial }}{{ record.mode.value|upper }}.</label>
+        <label><input class="inline" type="checkbox" name="acceptance" value="{{ ('partial-' if capacity.is_partial else '') ~ record.mode.value }}" required> I explicitly accept this {{ 'partial ' if capacity.is_partial }}{{ record.mode.value|upper }}{% if record.inaccessible_paths %} of accessible media{% endif %}.</label>
         <button class="{{ 'danger' if record.mode == mode.MOVE }}" type="submit">{{ '⚠️' if record.mode == mode.MOVE else '✓' }} Confirm {{ record.mode.value|upper }}</button>
       </form>
       <form method="post" action="{{ url_for('browser.decide_move' if record.mode == mode.MOVE else 'browser.decide_copy', copy_id=record.copy_id) }}">
