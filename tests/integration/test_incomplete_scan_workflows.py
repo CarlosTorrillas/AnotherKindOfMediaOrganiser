@@ -47,7 +47,7 @@ def test_verify_collisions_warns_that_its_scan_is_incomplete(
     assert "Verification covers accessible media only." in captured.err
 
 
-def test_organise_refuses_incomplete_scan_before_any_write(
+def test_organise_warns_and_declining_incomplete_copy_writes_nothing(
     tmp_path: Path, capsys, monkeypatch
 ) -> None:
     source = tmp_path / "source"
@@ -61,24 +61,47 @@ def test_organise_refuses_incomplete_scan_before_any_write(
     result = incomplete_result(source)
     monkeypatch.setattr(cli, "scan_media_collection", lambda _path: result)
 
-    def unexpected_action(*_args, **_kwargs):
-        raise AssertionError(
-            "incomplete scan must stop before planning or confirmation"
-        )
-
-    monkeypatch.setattr(cli, "generate_organisation_proposal", unexpected_action)
-    monkeypatch.setattr("builtins.input", unexpected_action)
+    monkeypatch.setattr("builtins.input", lambda _prompt: "no")
 
     assert (
         cli.main(
-            ["organise", str(source), "--destination", str(destination), "--move"]
+            ["organise", str(source), "--destination", str(destination)]
         )
-        == 2
+        == 0
     )
 
     captured = capsys.readouterr()
-    assert "Organisation refused: source scan is incomplete." in captured.err
-    assert "No destination files or directories have been created." in captured.err
+    assert "WARNING: Some files or folders cannot be accessed." in captured.out
+    assert "The COPY operation will be incomplete." in captured.out
+    assert str(source / "private") in captured.out
+    assert "Permission denied" in captured.out
+    assert "organise the accessible media" in captured.out
+    assert "Organisation cancelled before copying." in captured.out
     assert media.read_bytes() == b"valuable"
     assert sentinel.read_bytes() == b"keep"
     assert sorted(destination.iterdir()) == [sentinel]
+
+
+def test_organise_accessible_media_after_accepting_incomplete_move(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    media = source / "photo.jpg"
+    media.write_bytes(b"valuable")
+    destination = tmp_path / "destination"
+    result = incomplete_result(source)
+    monkeypatch.setattr(cli, "scan_media_collection", lambda _path: result)
+    monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
+
+    assert cli.main(
+        ["organise", str(source), "--destination", str(destination), "--move"]
+    ) == 0
+
+    captured = capsys.readouterr()
+    assert "The MOVE operation will be incomplete." in captured.out
+    assert "Organisation completed with inaccessible items skipped." in captured.out
+    assert "Skipped inaccessible paths: 1" in captured.out
+    assert str(source / "private") in captured.out
+    assert next(destination.rglob("*.jpg")).read_bytes() == b"valuable"
+    assert not media.exists()

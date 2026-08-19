@@ -89,8 +89,7 @@ At the scan-root level, the known macOS metadata directories
 `.DocumentRevisions-V100`, `.Spotlight-V100`, `.TemporaryItems`, `.Trashes`, and
 `.fseventsd` are excluded by default. Other hidden directories are scanned
 normally. Encountered exclusions are reported separately from inaccessible
-paths; an unexpected access failure still makes the scan incomplete and blocks
-organisation.
+paths; an unexpected access failure still makes the scan incomplete.
 
 The `propose` command is lightweight and read-only: it calculates destinations
 and reports naming conflicts without reading or hashing media content. Explicit
@@ -129,9 +128,12 @@ filesystem paths are counted and sampled rather than silently ignored.
 `propose` and `verify-collisions` warn when their results cover only accessible
 media. COPY remains the default. Explicit `--move` copies each file, verifies the
 source and destination sizes and SHA-256 content, and only then deletes that source.
-It does not use cached hashes as evidence for deletion. `organise` refuses an
-incomplete source scan before creating or copying
-anything; there is no override.
+It does not use cached hashes as evidence for deletion. When an `organise` scan
+is incomplete, confirmation identifies the inaccessible paths and warns that
+COPY or MOVE cannot be complete. Declining writes nothing. Explicitly
+continuing organises only the accessible eligible media through the normal
+execution workflow, leaves inaccessible items untouched, and reports the
+skipped inaccessible scope on completion.
 
 Atomic copies preserve file content and the modification timestamp required by
 the current Media Creation Date fallback. They deliberately do not copy Finder

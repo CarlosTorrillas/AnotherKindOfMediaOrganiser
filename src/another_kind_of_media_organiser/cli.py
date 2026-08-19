@@ -451,17 +451,6 @@ def main(arguments: Sequence[str] | None = None) -> int:
             _print_cancellation(parsed_arguments.command)
             return 130
         if not result.is_complete:
-            if parsed_arguments.command == "organise":
-                print(
-                    "Organisation refused: source scan is incomplete.",
-                    file=sys.stderr,
-                )
-                _print_inaccessible_paths(result, output=sys.stderr)
-                print(
-                    "No destination files or directories have been created.",
-                    file=sys.stderr,
-                )
-                return 2
             if parsed_arguments.command == "propose":
                 _warn_incomplete_scan(
                     result, "Proposal includes accessible media only."
@@ -525,7 +514,10 @@ def main(arguments: Sequence[str] | None = None) -> int:
                 print("No media files have been copied.", file=sys.stderr)
                 return 2
             return _confirm_and_execute(
-                plan, move=parsed_arguments.move, capacity=capacity
+                plan,
+                move=parsed_arguments.move,
+                capacity=capacity,
+                scan_result=result,
             )
     else:
         print("AnotherKindOfMediaOrganiser")
@@ -554,6 +546,7 @@ def _confirm_and_execute(
     *,
     move: bool = False,
     capacity: CapacityPreflight | None = None,
+    scan_result: ScanResult | None = None,
 ) -> int:
     if capacity is not None:
         _print_capacity_preflight(capacity)
@@ -569,6 +562,14 @@ def _confirm_and_execute(
         print("\nTHIS OPERATION WILL DELETE SOURCE FILES.")
     else:
         print("\nSource files will NOT be modified or deleted.")
+    if scan_result is not None and not scan_result.is_complete:
+        print("\nWARNING: Some files or folders cannot be accessed.")
+        print(f"The {action.upper()} operation will be incomplete.")
+        _print_inaccessible_paths(scan_result)
+        print(
+            "Inaccessible items will be skipped and left untouched.\n"
+            "Do you want to continue and organise the accessible media?"
+        )
     try:
         if capacity is not None and capacity.is_partial:
             print("\nContinue with this partial organisation? [y/N] ", end="")
@@ -642,11 +643,18 @@ def _confirm_and_execute(
         )
         return 1
 
-    print(
-        "\nPartial organisation completed."
-        if capacity is not None and capacity.is_partial
-        else "\nOrganisation completed."
-    )
+    if scan_result is not None and not scan_result.is_complete:
+        print(
+            "\nPartial organisation completed with inaccessible items skipped."
+            if capacity is not None and capacity.is_partial
+            else "\nOrganisation completed with inaccessible items skipped."
+        )
+    else:
+        print(
+            "\nPartial organisation completed."
+            if capacity is not None and capacity.is_partial
+            else "\nOrganisation completed."
+        )
     if capacity is not None and capacity.is_partial:
         print(f"\nOrganised:\n  {_format_month_range(capacity.included_months)}")
     print(f"Files copied: {result.files_copied} / {result.total_files}")
@@ -658,6 +666,10 @@ def _confirm_and_execute(
         print("Source files have not been modified.")
     if capacity is not None and capacity.is_partial:
         print("Remaining media was not modified.")
+    if scan_result is not None and not scan_result.is_complete:
+        print(f"Skipped inaccessible paths: {len(scan_result.inaccessible_paths)}")
+        _print_inaccessible_paths(scan_result)
+        print("Inaccessible items were left untouched.")
     return 0
 
 

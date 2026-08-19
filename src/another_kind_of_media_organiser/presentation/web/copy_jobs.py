@@ -29,6 +29,7 @@ from another_kind_of_media_organiser.application.generate_organisation_proposal 
 from another_kind_of_media_organiser.application.scan_media_collection import (
     scan_media_collection,
 )
+from another_kind_of_media_organiser.domain.media import InaccessiblePath
 from another_kind_of_media_organiser.infrastructure.filesystem_capacity import (
     allocation_unit,
     available_capacity,
@@ -55,6 +56,7 @@ class CopyRecord:
     mode: OrganisationExecutionMode
     capacity: CapacityPreflight
     plan: OrganisationExecutionPlan | None
+    inaccessible_paths: tuple[InaccessiblePath, ...] = ()
     state: CopyState = CopyState.AWAITING_CONFIRMATION
     progress: OrganisationExecutionProgress | None = None
     result: OrganisationExecutionResult | None = None
@@ -75,10 +77,6 @@ class CopyRecord:
 CapacityProvider = Callable[[Path], int]
 AllocationProvider = Callable[[Path], int]
 Executor = Callable[..., OrganisationExecutionResult]
-
-
-class IncompleteScanError(ValueError):
-    pass
 
 
 class CopyCoordinator:
@@ -112,10 +110,6 @@ class CopyCoordinator:
             if exclusions
             else scan_media_collection(source)
         )
-        if not result.is_complete:
-            raise IncompleteScanError(
-                "Organisation refused: source scan is incomplete."
-            )
         proposal = generate_organisation_proposal(result)
         full_plan = prepare_organisation_execution(proposal, source, destination)
         capacity = self._plan_capacity(proposal, destination)
@@ -135,6 +129,12 @@ class CopyCoordinator:
             mode,
             capacity,
             plan,
+            inaccessible_paths=tuple(
+                sorted(
+                    result.inaccessible_paths,
+                    key=lambda item: item.path.as_posix(),
+                )
+            ),
             total_files=len(plan.items) if plan else 0,
         )
         with self._lock:

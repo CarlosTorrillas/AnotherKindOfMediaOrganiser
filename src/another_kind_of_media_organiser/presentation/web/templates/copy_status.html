@@ -19,7 +19,7 @@
       {% endif %}
       <p>{% if record.mode == mode.MOVE %}Each source is deleted only after its destination is verified.{% else %}Source files will NOT be deleted.{% endif %}</p>
     {% elif record.state == state.COMPLETED %}
-      <div class="section-heading"><span class="heading-icon" aria-hidden="true">🎉</span><h1>{{ 'Partial organisation completed.' if record.capacity.is_partial else 'Organisation ' ~ record.mode.value|upper ~ ' completed' }}</h1></div>
+      <div class="section-heading"><span class="heading-icon" aria-hidden="true">🎉</span><h1>{{ ('Partial organisation completed with inaccessible items skipped' if record.capacity.is_partial else 'Organisation completed with inaccessible items skipped') if record.inaccessible_paths else ('Partial organisation completed.' if record.capacity.is_partial else 'Organisation ' ~ record.mode.value|upper ~ ' completed') }}</h1></div>
       {% if record.capacity.is_partial %}<p>Organised:<br>{{ month_range }}</p>{% endif %}
       <dl class="summary">
         <dt>Files {{ 'moved' if record.mode == mode.MOVE else 'copied' }}</dt><dd>{{ record.result.files_copied }} / {{ record.result.total_files }}</dd>
@@ -28,6 +28,13 @@
       </dl>
       {% if record.mode == mode.COPY %}<p>Source files have not been modified.</p>{% endif %}
       {% if record.capacity.is_partial %}<p>Remaining media was not modified.</p>{% endif %}
+      {% if record.inaccessible_paths %}
+        <div class="message warning" role="status"><strong>Skipped inaccessible paths</strong></div>
+        <dl class="summary"><dt>Skipped inaccessible paths</dt><dd>{{ record.inaccessible_paths|length }}</dd></dl>
+        <ul>{% for item in inaccessible_examples %}<li>{{ item.path }} ({{ item.reason }})</li>{% endfor %}</ul>
+        {% if record.inaccessible_paths|length > inaccessible_examples|length %}<p>Showing {{ inaccessible_examples|length }} of {{ record.inaccessible_paths|length }} inaccessible paths.</p>{% endif %}
+        <p>Inaccessible items were left untouched.</p>
+      {% endif %}
     {% elif record.state == state.DECLINED %}
       <div class="section-heading"><span class="heading-icon" aria-hidden="true">↩️</span><h1>Organisation {{ record.mode.value|upper }} declined</h1></div>
       <p>No filesystem content has been modified.</p>

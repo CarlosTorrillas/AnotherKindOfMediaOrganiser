@@ -3,6 +3,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 from behave import given, then, when
 
@@ -65,17 +66,27 @@ def step_partial_verification(context) -> None:
     _run(context, ["verify-collisions", str(context.source)])
 
 
-@when("the user attempts Organisation Execution from the incomplete scan")
-def step_refused_execution(context) -> None:
-    _run(
-        context,
-        [
-            "organise",
-            str(context.source),
-            "--destination",
-            str(context.destination),
-        ],
-    )
+def _run_incomplete_execution(context, answer: str) -> None:
+    with patch("builtins.input", return_value=answer):
+        _run(
+            context,
+            [
+                "organise",
+                str(context.source),
+                "--destination",
+                str(context.destination),
+            ],
+        )
+
+
+@when("the user declines Organisation Execution from the incomplete scan")
+def step_declined_execution(context) -> None:
+    _run_incomplete_execution(context, "no")
+
+
+@when("the user accepts Organisation Execution from the incomplete scan")
+def step_accepted_execution(context) -> None:
+    _run_incomplete_execution(context, "yes")
 
 
 @then("the CLI reports that the scan is incomplete")
@@ -101,10 +112,30 @@ def step_partial_verification_warning(context) -> None:
     assert "Verification covers accessible media only." in context.error
 
 
-@then("Organisation Execution is refused before writing")
-def step_execution_refused(context) -> None:
-    assert context.exit_code != 0
-    assert "Organisation refused: source scan is incomplete." in context.error
+@then("the incomplete-operation warning and inaccessible scope are reported")
+def step_incomplete_warning(context) -> None:
+    assert context.exit_code == 0
+    assert "Some files or folders cannot be accessed." in context.output
+    assert "The COPY operation will be incomplete." in context.output
+    assert str(context.inaccessible) in context.output
+    assert "Permission denied" in context.output
+    assert "organise the accessible media" in context.output
+
+
+@then("the accessible media is organised")
+def step_accessible_media_organised(context) -> None:
+    assert context.exit_code == 0
+    copied = next(context.destination.rglob("*.jpg"))
+    assert copied.read_bytes() == b"valuable"
+    assert context.media.read_bytes() == b"valuable"
+
+
+@then("the skipped inaccessible scope is reported after completion")
+def step_skipped_scope_reported(context) -> None:
+    assert "Organisation completed with inaccessible items skipped." in context.output
+    assert "Skipped inaccessible paths: 1" in context.output
+    assert str(context.inaccessible) in context.output
+    assert "Inaccessible items were left untouched." in context.output
 
 
 @then("the source and Destination Collection remain unchanged")
