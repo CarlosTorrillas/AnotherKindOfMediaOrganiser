@@ -16,7 +16,7 @@ A read-only inspection of a Media Collection. A Scan gathers information about t
 
 ## Incomplete Scan
 
-A Scan that encountered one or more inaccessible filesystem paths. Its Scan Result contains only information that could be inspected safely and records the inaccessible paths and reported reasons. An incomplete Scan may inform a partial Organisation Proposal or Collision Verification, but it must never be used for Organisation Execution.
+A Scan that encountered one or more inaccessible filesystem paths. Its Scan Result contains only information that could be inspected safely and records the inaccessible paths and reported reasons. An incomplete Scan may inform an Organisation Proposal or Collision Verification covering accessible media. It may also support Organisation Execution only after the user is shown the inaccessible scope, warned that COPY or MOVE will be incomplete, and explicitly chooses to organise the accessible eligible media. Inaccessible items remain untouched.
 
 ## Excluded Path
 

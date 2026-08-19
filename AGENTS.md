@@ -81,8 +81,10 @@ Preserve these established distinctions and invariants:
 - Collision Verification is an explicit, potentially expensive, read-only
   workflow. It may use size checks, streamed SHA-256, and the persistent cache,
   but it never modifies media.
-- An incomplete Scan may support an explicitly warned proposal or verification,
-  but it must never be used for Organisation Execution.
+- An incomplete Scan may support an explicitly warned proposal or verification.
+  It may support Organisation Execution only after the inaccessible scope and
+  incomplete outcome are clearly warned and the user explicitly accepts
+  organising the accessible eligible media. Inaccessible items remain untouched.
 
 ### Organisation Execution
 
