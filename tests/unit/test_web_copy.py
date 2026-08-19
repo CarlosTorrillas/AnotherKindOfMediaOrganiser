@@ -15,14 +15,11 @@ from another_kind_of_media_organiser.presentation.web import create_app
 from another_kind_of_media_organiser.presentation.web.copy_jobs import (
     CopyCoordinator,
     CopyState,
-    IncompleteScanError,
 )
 from another_kind_of_media_organiser.domain.media import (
     InaccessiblePath,
-    MediaCategory,
     ScanResult,
 )
-import pytest
 
 
 def _media(path: Path, content: bytes, year: int = 2024, month: int = 1) -> None:
@@ -226,7 +223,7 @@ def test_running_copy_displays_reconnectable_progress(tmp_path: Path) -> None:
     assert b"Data copied</dt><dd>18.4 GiB" in response.data
 
 
-def test_incomplete_scan_refuses_browser_copy_before_any_write(
+def test_incomplete_scan_warns_before_copy_and_reports_skipped_paths(
     tmp_path: Path, monkeypatch
 ) -> None:
     import another_kind_of_media_organiser.presentation.web.copy_jobs as copy_jobs
@@ -234,24 +231,38 @@ def test_incomplete_scan_refuses_browser_copy_before_any_write(
     source = tmp_path / "source"
     source.mkdir()
     destination = tmp_path / "destination"
+    _media(source / "photo.jpg", b"valuable")
+    complete_result = copy_jobs.scan_media_collection(source)
     result = ScanResult(
-        total_files=0,
-        unsupported_files=0,
-        directories_scanned=1,
-        counts_by_category={category: 0 for category in MediaCategory},
-        recognised_extension_counts={},
-        unsupported_extension_counts={},
-        media_entries=(),
-        inaccessible_paths=(
-            InaccessiblePath(source / "private", "Permission denied"),
-        ),
+        **{
+            **complete_result.__dict__,
+            "inaccessible_paths": (
+                InaccessiblePath(source / "private", "Permission denied"),
+            ),
+        }
     )
     monkeypatch.setattr(copy_jobs, "scan_media_collection", lambda *_a, **_k: result)
 
-    with pytest.raises(IncompleteScanError):
-        _coordinator().prepare(source, destination, ())
+    coordinator = _coordinator()
+    record = coordinator.prepare(source, destination, ())
+    response = _client(coordinator).get(f"/copy-preflights/{record.copy_id}")
 
+    assert b"Some files or folders cannot be accessed." in response.data
+    assert b"The COPY operation will be incomplete." in response.data
+    assert str(source / "private").encode() in response.data
+    assert b"Permission denied" in response.data
+    assert b"organise the accessible media" in response.data
     assert not destination.exists()
+
+    job = coordinator.confirm(record.copy_id, acceptance="copy")
+    assert job is not None
+    assert job.finished.wait(timeout=5)
+    completed = _client(coordinator).get(f"/copies/{record.copy_id}")
+
+    assert b"completed with inaccessible items skipped" in completed.data
+    assert b"Skipped inaccessible paths</dt><dd>1" in completed.data
+    assert str(source / "private").encode() in completed.data
+    assert next(destination.rglob("*.jpg")).read_bytes() == b"valuable"
 
 
 def test_capacity_drop_after_review_refuses_confirmation_without_writing(

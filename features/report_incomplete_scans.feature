@@ -19,7 +19,12 @@ Feature: Report incomplete scans
     When the user verifies collisions from the incomplete scan
     Then the CLI warns that verification covers accessible media only
 
-  Scenario: Refuse Organisation Execution
-    When the user attempts Organisation Execution from the incomplete scan
-    Then Organisation Execution is refused before writing
+  Scenario: Decline incomplete Organisation Execution
+    When the user declines Organisation Execution from the incomplete scan
+    Then the incomplete-operation warning and inaccessible scope are reported
     And the source and Destination Collection remain unchanged
+
+  Scenario: Continue with accessible media
+    When the user accepts Organisation Execution from the incomplete scan
+    Then the accessible media is organised
+    And the skipped inaccessible scope is reported after completion
