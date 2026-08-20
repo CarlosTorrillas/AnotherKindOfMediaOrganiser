@@ -29,6 +29,15 @@ executable specification for user-facing or acceptance-level behaviour. Prefer
 a focused pytest test when it communicates the requirement better. Tests should
 describe observable behaviour rather than implementation details.
 
+When using Gherkin, GIVEN/AND establishes the world before the behaviour under
+test: known data, existing state, behaviour already provided by AKOMO, resolved
+dependencies, or behaviour that can be relied on from an external system. WHEN
+represents the single atomic action under test; prefer exactly one WHEN per
+scenario. If something has already happened to establish the scenario, model it
+as GIVEN/AND rather than introducing another WHEN. THEN/AND describes the
+observable consequences of that action. Keep scenarios focused so the action
+being exercised is unambiguous.
+
 For behaviour changes, normally preserve a visible progression:
 
 1. **RED** — add a focused test or executable specification that fails for the
