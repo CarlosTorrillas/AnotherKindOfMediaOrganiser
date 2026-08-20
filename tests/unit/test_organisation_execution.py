@@ -32,7 +32,7 @@ def proposal_for(root: Path, files: dict[str, bytes]):
     return generate_organisation_proposal(scan_media_collection(root))
 
 
-@pytest.mark.parametrize("relationship", ["same", "destination_inside", "source_inside"])
+@pytest.mark.parametrize("relationship", ["same", "source_inside"])
 def test_preflight_rejects_unsafe_source_destination_relationships(
     tmp_path: Path, relationship: str
 ) -> None:
@@ -40,8 +40,6 @@ def test_preflight_rejects_unsafe_source_destination_relationships(
     proposal = proposal_for(source, {"photo.jpg": b"valuable"})
     if relationship == "same":
         destination = source
-    elif relationship == "destination_inside":
-        destination = source / "organised"
     else:
         destination = tmp_path
 
@@ -49,6 +47,19 @@ def test_preflight_rejects_unsafe_source_destination_relationships(
         prepare_organisation_execution(proposal, source, destination)
 
     assert (source / "photo.jpg").read_bytes() == b"valuable"
+
+
+def test_preflight_allows_a_destination_inside_the_source(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    proposal = proposal_for(source, {"photo.jpg": b"valuable"})
+    destination = source / "organised"
+
+    plan = prepare_organisation_execution(proposal, source, destination)
+
+    assert plan.destination_is_inside_source
+    assert [item.source for item in plan.items] == [source / "photo.jpg"]
 
 
 def test_preflight_rejects_a_destination_that_escapes_the_root(

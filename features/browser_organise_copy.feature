@@ -38,3 +38,22 @@ Feature: Organise an accepted proposal by COPY from the browser
     Given browser COPY is already running
     When the browser submits COPY execution again
     Then a second browser COPY is not started
+
+  Scenario: User is warned when the destination is inside the source
+    Given the selected browser destination is contained within the selected source
+    And no filesystem mutation has started for the contained destination
+    When the user starts browser Organisation Execution
+    Then AKOMO warns that the browser destination is inside the source
+    And AKOMO requires explicit browser confirmation before continuing
+
+  Scenario: User declines to continue with a destination inside the source
+    Given AKOMO has warned about the browser destination inside the source
+    When the user declines the contained-destination browser COPY
+    Then AKOMO performs no filesystem mutation for the contained destination
+
+  Scenario: User confirms organisation into a destination inside the source
+    Given AKOMO has warned about the browser destination inside the source
+    When the user confirms the contained-destination browser COPY
+    Then AKOMO organises the eligible browser source media
+    And the browser destination tree is not treated as source material
+    And media written into the browser destination does not become a new candidate
