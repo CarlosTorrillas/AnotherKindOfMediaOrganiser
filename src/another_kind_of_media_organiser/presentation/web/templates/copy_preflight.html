@@ -32,6 +32,13 @@
         <p>Each file will be copied and verified before its original source file is deleted.</p>
         <div class="message danger-message" role="alert"><strong>THIS OPERATION WILL DELETE SOURCE FILES.</strong></div>
       {% else %}<p><strong>Source files will NOT be deleted.</strong></p>{% endif %}
+      {% if record.plan.destination_is_inside_source %}
+        <div class="message warning" role="alert">
+          <strong>The Destination Collection is inside the source Media Collection.</strong>
+          The destination tree will be excluded from source material for this operation.
+          Media written there will not become new organisation candidates during this operation.
+        </div>
+      {% endif %}
       {% if record.inaccessible_paths %}
         <div class="message warning" role="alert">
           <strong>Some files or folders cannot be accessed.</strong>
@@ -45,7 +52,7 @@
       <p>Continue? The default is NO.</p>
       <form method="post" action="{{ url_for('browser.decide_move' if record.mode == mode.MOVE else 'browser.decide_copy', copy_id=record.copy_id) }}">
         <input type="hidden" name="decision" value="confirm">
-        <label><input class="inline" type="checkbox" name="acceptance" value="{{ ('partial-' if capacity.is_partial else '') ~ record.mode.value }}" required> I explicitly accept this {{ 'partial ' if capacity.is_partial }}{{ record.mode.value|upper }}{% if record.inaccessible_paths %} of accessible media{% endif %}.</label>
+        <label><input class="inline" type="checkbox" name="acceptance" value="{{ ('partial-' if capacity.is_partial else '') ~ record.mode.value }}" required> I explicitly accept this {{ 'partial ' if capacity.is_partial }}{{ record.mode.value|upper }}{% if record.inaccessible_paths %} of accessible media{% endif %}{% if record.plan.destination_is_inside_source %}, and explicitly accept organising into a destination inside the source{% endif %}.</label>
         <button class="{{ 'danger' if record.mode == mode.MOVE }}" type="submit">{{ '⚠️' if record.mode == mode.MOVE else '✓' }} Confirm {{ record.mode.value|upper }}</button>
       </form>
       <form method="post" action="{{ url_for('browser.decide_move' if record.mode == mode.MOVE else 'browser.decide_copy', copy_id=record.copy_id) }}">

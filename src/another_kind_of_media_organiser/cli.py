@@ -20,6 +20,7 @@ from another_kind_of_media_organiser.application.execute_organisation_proposal i
     OrganisationExecutionProgress,
     OrganisationVerificationError,
     UnsafeDestinationError,
+    destination_exclusion,
     execute_organisation_plan,
     prepare_organisation_execution,
 )
@@ -424,10 +425,18 @@ def main(arguments: Sequence[str] | None = None) -> int:
         "organise",
     }:
         try:
-            if parsed_arguments.exclude:
+            exclusions = tuple(parsed_arguments.exclude)
+            if parsed_arguments.command == "organise":
+                automatic_exclusion = destination_exclusion(
+                    parsed_arguments.directory,
+                    parsed_arguments.destination,
+                )
+                if automatic_exclusion is not None:
+                    exclusions += (automatic_exclusion,)
+            if exclusions:
                 result = scan_media_collection(
                     parsed_arguments.directory,
-                    excluded_paths=tuple(parsed_arguments.exclude),
+                    excluded_paths=exclusions,
                 )
             else:
                 result = scan_media_collection(parsed_arguments.directory)
@@ -569,6 +578,19 @@ def _confirm_and_execute(
         print(
             "Inaccessible items will be skipped and left untouched.\n"
             "Do you want to continue and organise the accessible media?"
+        )
+    if plan.destination_is_inside_source:
+        print(
+            "\nWARNING: The Destination Collection is inside the source "
+            "Media Collection."
+        )
+        print(
+            "The destination tree will be excluded from source material for "
+            "this operation."
+        )
+        print(
+            "Media written there will not become new organisation candidates "
+            "during this operation."
         )
     try:
         if capacity is not None and capacity.is_partial:

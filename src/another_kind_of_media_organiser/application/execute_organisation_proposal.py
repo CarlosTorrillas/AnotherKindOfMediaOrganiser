@@ -31,6 +31,7 @@ class OrganisationExecutionPlan:
     destination_root: Path
     items: tuple[OrganisationExecutionItem, ...]
     name_conflict_files: int
+    destination_is_inside_source: bool = False
 
 
 @dataclass(frozen=True)
@@ -102,7 +103,9 @@ def prepare_organisation_execution(
     """Validate the complete copy plan without creating destination content."""
     source = source_root.resolve(strict=True)
     destination = destination_root.resolve(strict=False)
-    _validate_root_relationship(source, destination)
+    destination_is_inside_source = (
+        destination_exclusion(source, destination) is not None
+    )
     if _path_exists(destination) and not destination.is_dir():
         raise UnsafeDestinationError(
             f"Destination Collection is not a directory: {destination}"
@@ -152,6 +155,7 @@ def prepare_organisation_execution(
         destination,
         tuple(items),
         proposal.name_conflict_files,
+        destination_is_inside_source,
     )
 
 
@@ -243,15 +247,19 @@ def execute_organisation_plan(
     )
 
 
-def _validate_root_relationship(source: Path, destination: Path) -> None:
+def destination_exclusion(source_root: Path, destination_root: Path) -> Path | None:
+    """Return the relative destination subtree to exclude, rejecting unsafe roots."""
+    source = source_root.resolve(strict=False)
+    destination = destination_root.resolve(strict=False)
     if source == destination:
         raise UnsafeDestinationError("Source and destination must be different")
     if destination.is_relative_to(source):
-        raise UnsafeDestinationError("Destination Collection cannot be inside source")
+        return destination.relative_to(source)
     if source.is_relative_to(destination):
         raise UnsafeDestinationError(
             "Source Media Collection cannot be inside destination"
         )
+    return None
 
 
 def _validate_destination_parents(path: Path, root: Path) -> None:
