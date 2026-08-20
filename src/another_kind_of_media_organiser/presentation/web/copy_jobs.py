@@ -20,6 +20,7 @@ from another_kind_of_media_organiser.application.execute_organisation_proposal i
     OrganisationExecutionProgress,
     OrganisationExecutionResult,
     OrganisationVerificationError,
+    destination_exclusion,
     execute_organisation_plan,
     prepare_organisation_execution,
 )
@@ -105,19 +106,35 @@ class CopyCoordinator:
         *,
         mode: OrganisationExecutionMode = OrganisationExecutionMode.COPY,
     ) -> CopyRecord:
+        automatic_exclusion = destination_exclusion(
+            source,
+            destination,
+            mode=mode,
+        )
+        effective_exclusions = exclusions + (
+            (automatic_exclusion,) if automatic_exclusion is not None else ()
+        )
         result = (
-            scan_media_collection(source, excluded_paths=exclusions)
-            if exclusions
+            scan_media_collection(source, excluded_paths=effective_exclusions)
+            if effective_exclusions
             else scan_media_collection(source)
         )
         proposal = generate_organisation_proposal(result)
-        full_plan = prepare_organisation_execution(proposal, source, destination)
+        full_plan = prepare_organisation_execution(
+            proposal,
+            source,
+            destination,
+            mode=mode,
+        )
         capacity = self._plan_capacity(proposal, destination)
         if capacity.execution_proposal is None:
             plan = None
         elif capacity.is_partial:
             plan = prepare_organisation_execution(
-                capacity.execution_proposal, source, destination
+                capacity.execution_proposal,
+                source,
+                destination,
+                mode=mode,
             )
         else:
             plan = full_plan
@@ -177,7 +194,10 @@ class CopyCoordinator:
                     "accepted proposal. Run Capacity Preflight again."
                 )
             record.plan = prepare_organisation_execution(
-                accepted_proposal, record.source, record.destination
+                accepted_proposal,
+                record.source,
+                record.destination,
+                mode=record.mode,
             )
             record.total_files = len(record.plan.items)
         except Exception as error:

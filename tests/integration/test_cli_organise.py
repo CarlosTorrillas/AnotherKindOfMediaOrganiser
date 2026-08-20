@@ -85,6 +85,62 @@ def test_accepting_confirmation_copies_the_lightweight_proposal(
     assert second.read_bytes() == b"two"
 
 
+def test_destination_inside_source_is_warned_excluded_and_requires_confirmation(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    source = tmp_path / "source"
+    destination = source / "Organised"
+    _dated_file(source / "photo.jpg", b"valuable", 2024, 1)
+    _dated_file(destination / "existing.jpg", b"existing output", 2023, 1)
+    monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
+
+    assert main(["organise", str(source), "--destination", str(destination)]) == 0
+
+    output = capsys.readouterr().out
+    assert "WARNING: The Destination Collection is inside the source Media Collection." in output
+    assert "excluded from source material for this operation" in output
+    copied = list((destination / "2024").rglob("*.jpg"))
+    assert len(copied) == 1
+    assert copied[0].read_bytes() == b"valuable"
+    assert (destination / "existing.jpg").read_bytes() == b"existing output"
+
+
+def test_declining_destination_inside_source_performs_no_mutation(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    source = tmp_path / "source"
+    destination = source / "Organised"
+    _dated_file(source / "photo.jpg", b"valuable", 2024, 1)
+    monkeypatch.setattr("builtins.input", lambda _prompt: "no")
+
+    assert main(["organise", str(source), "--destination", str(destination)]) == 0
+
+    assert "Destination Collection is inside" in capsys.readouterr().out
+    assert not destination.exists()
+    assert (source / "photo.jpg").read_bytes() == b"valuable"
+
+
+def test_move_inside_source_warns_excludes_destination_and_moves_eligible_media(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    source = tmp_path / "source"
+    destination = source / "Organised"
+    _dated_file(source / "photo.jpg", b"valuable", 2024, 1)
+    _dated_file(destination / "existing.jpg", b"existing output", 2023, 1)
+    monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
+
+    assert main(
+        ["organise", str(source), "--destination", str(destination), "--move"]
+    ) == 0
+
+    output = capsys.readouterr().out
+    assert "WARNING: The Destination Collection is inside" in output
+    assert "THIS OPERATION WILL DELETE SOURCE FILES." in output
+    assert not (source / "photo.jpg").exists()
+    assert (destination / "existing.jpg").read_bytes() == b"existing output"
+    assert len(list((destination / "2024").rglob("*.jpg"))) == 1
+
+
 def test_destination_conflict_fails_before_confirmation_or_copying(
     tmp_path: Path, capsys, monkeypatch
 ) -> None:

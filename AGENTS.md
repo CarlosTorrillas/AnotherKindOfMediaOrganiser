@@ -29,6 +29,15 @@ executable specification for user-facing or acceptance-level behaviour. Prefer
 a focused pytest test when it communicates the requirement better. Tests should
 describe observable behaviour rather than implementation details.
 
+When using Gherkin, GIVEN/AND establishes the world before the behaviour under
+test: known data, existing state, behaviour already provided by AKOMO, resolved
+dependencies, or behaviour that can be relied on from an external system. WHEN
+represents the single atomic action under test; prefer exactly one WHEN per
+scenario. If something has already happened to establish the scenario, model it
+as GIVEN/AND rather than introducing another WHEN. THEN/AND describes the
+observable consequences of that action. Keep scenarios focused so the action
+being exercised is unambiguous.
+
 For behaviour changes, normally preserve a visible progression:
 
 1. **RED** — add a focused test or executable specification that fails for the
@@ -89,14 +98,18 @@ Preserve these established distinctions and invariants:
 ### Organisation Execution
 
 - Organisation Execution is the writing boundary and requires an accepted
-  proposal, a separate Destination Collection, capacity preflight, destination
-  conflict checks, and explicit user confirmation.
+  proposal, a Destination Collection, capacity preflight, destination conflict
+  checks, and explicit user confirmation.
 - COPY is always the default. It leaves every source file unchanged.
 - MOVE is explicitly selected and must preserve this order for each file:
   **COPY → byte-for-byte VERIFY → DELETE SOURCE**. Never use a cached digest as
   evidence authorising source deletion.
-- Never overwrite an existing destination. Reject source/destination overlap,
-  destinations inside the source, and sources inside the destination.
+- Never overwrite an existing destination. Reject identical source/destination
+  roots and a source inside the destination. A destination inside the source
+  requires a specific warning and explicit confirmation, and its entire subtree
+  must be excluded from source material before the proposal is generated so
+  existing or newly written destination media cannot become candidates during
+  that operation.
 - Atomic copies use a distinguishable same-directory temporary file, clean an
   incomplete temporary copy where safe, and preserve only the required
   modification timestamp rather than broad macOS metadata.

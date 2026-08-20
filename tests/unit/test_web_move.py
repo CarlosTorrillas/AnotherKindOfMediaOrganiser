@@ -69,6 +69,54 @@ def test_confirmed_move_uses_verified_application_mode(tmp_path: Path) -> None:
     assert record.result.source_files_deleted == 1
 
 
+def test_move_inside_source_warns_excludes_destination_and_requires_confirmation(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    destination = source / "Organised"
+    _media(source / "photo.jpg", b"valuable")
+    _media(destination / "existing.jpg", b"existing output")
+    coordinator = _coordinator()
+
+    record = coordinator.prepare(
+        source,
+        destination,
+        (),
+        mode=OrganisationExecutionMode.MOVE,
+    )
+    response = _client(coordinator).get(f"/move-preflights/{record.copy_id}")
+
+    assert b"Destination Collection is inside the source Media Collection" in response.data
+    assert b"THIS OPERATION WILL DELETE SOURCE FILES." in response.data
+    assert [item.source for item in record.plan.items] == [source / "photo.jpg"]
+    assert (source / "photo.jpg").read_bytes() == b"valuable"
+    assert (destination / "existing.jpg").read_bytes() == b"existing output"
+
+
+def test_confirmed_move_inside_source_moves_only_eligible_source_media(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    destination = source / "Organised"
+    _media(source / "photo.jpg", b"valuable")
+    _media(destination / "existing.jpg", b"existing output")
+    coordinator = _coordinator()
+    record = coordinator.prepare(
+        source,
+        destination,
+        (),
+        mode=OrganisationExecutionMode.MOVE,
+    )
+
+    coordinator.confirm(record.copy_id, acceptance="move")
+    assert record.finished.wait(timeout=5)
+
+    assert record.state is CopyState.COMPLETED
+    assert not (source / "photo.jpg").exists()
+    assert (destination / "existing.jpg").read_bytes() == b"existing output"
+    assert len(list((destination / "2024").rglob("*.jpg"))) == 1
+
+
 def test_verification_failure_reports_and_preserves_source(tmp_path: Path) -> None:
     source = tmp_path / "source"
     destination = tmp_path / "destination"

@@ -4,11 +4,11 @@ This glossary defines the shared business vocabulary of AnotherKindOfMediaOrgani
 
 ## Media Collection
 
-The source root directory selected by the user for scanning. A Media Collection may contain files and nested directories. Organisation Execution treats it as read-only and never uses it as the Destination Collection.
+The source root directory selected by the user for scanning. A Media Collection may contain files and nested directories. Organisation Execution treats its eligible source material as read-only except for the source deletion explicitly performed by MOVE. A contained Destination Collection is outside that eligible source material for the operation.
 
 ## Destination Collection
 
-A separate root directory that receives organised copies during Organisation Execution. Its structure comes from an accepted Organisation Proposal. It must neither be inside nor contain the source Media Collection.
+A root directory that receives organised copies during Organisation Execution. Its structure comes from an accepted Organisation Proposal. It may be inside the source Media Collection only after a specific warning and explicit user confirmation; in that case its entire subtree is excluded before the Organisation Proposal is generated. It cannot be the same as the source or contain the source Media Collection.
 
 ## Scan
 
@@ -20,7 +20,7 @@ A Scan that encountered one or more inaccessible filesystem paths. Its Scan Resu
 
 ## Excluded Path
 
-A path intentionally declared outside the effective Media Collection before scanning. The scanner does not inspect an excluded file or descend into an excluded directory, records encountered exclusions separately, and does not make the Scan incomplete because of them. Exclusion never authorises ignoring an unexpected access failure, and excluded media cannot participate in COPY or MOVE Organisation Execution.
+A path established outside the effective Media Collection before scanning, either explicitly by the user, by an application default, or automatically because it is the contained Destination Collection for an Organisation Execution. The scanner does not inspect an excluded file or descend into an excluded directory, records encountered exclusions separately, and does not make the Scan incomplete because of them. Exclusion never authorises ignoring an unexpected access failure, and excluded media cannot participate in COPY or MOVE Organisation Execution.
 
 ## Scan Result
 

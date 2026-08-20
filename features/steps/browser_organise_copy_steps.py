@@ -277,6 +277,118 @@ def step_submit_again(context):
     assert context.record.finished.wait(timeout=5)
 
 
+@given("the selected browser destination is contained within the selected source")
+def step_contained_destination(context):
+    _workspace(context)
+    context.destination = context.source / "Organised"
+    _media(context.source / "photo.jpg", b"valuable")
+    _media(context.destination / "existing.jpg", b"existing output")
+    context.source_before = _snapshot(context.source)
+    _client(context)
+
+
+@given("no filesystem mutation has started for the contained destination")
+def step_contained_destination_unchanged(context):
+    assert _snapshot(context.source) == context.source_before
+
+
+@when("the user starts browser Organisation Execution")
+def step_start_contained_execution(context):
+    _preflight(context)
+
+
+@then("AKOMO warns that the browser destination is inside the source")
+def step_warn_contained_destination(context):
+    assert (
+        b"Destination Collection is inside the source Media Collection"
+        in context.response.data
+    )
+    assert b"excluded from source material for this operation" in context.response.data
+
+
+@then("AKOMO requires explicit browser confirmation before continuing")
+def step_require_contained_confirmation(context):
+    assert (
+        b"explicitly accept organising into a destination inside the source"
+        in context.response.data
+    )
+    assert context.record.state is CopyState.AWAITING_CONFIRMATION
+    assert _snapshot(context.source) == context.source_before
+
+
+@given("AKOMO has warned about the browser destination inside the source")
+def step_contained_warning_displayed(context):
+    step_contained_destination(context)
+    _preflight(context)
+    step_warn_contained_destination(context)
+
+
+@when("the user declines the contained-destination browser COPY")
+def step_decline_contained_copy(context):
+    _decision(context, decision="decline")
+
+
+@then("AKOMO performs no filesystem mutation for the contained destination")
+def step_no_contained_mutation(context):
+    assert context.record.state is CopyState.DECLINED
+    assert _snapshot(context.source) == context.source_before
+
+
+@when("the user confirms the contained-destination browser COPY")
+def step_confirm_contained_copy(context):
+    _decision(context, "copy")
+    assert context.record.finished.wait(timeout=5)
+
+
+@then("AKOMO organises the eligible browser source media")
+def step_organise_eligible_contained_media(context):
+    copied = list((context.destination / "2024").rglob("*.jpg"))
+    assert len(copied) == 1
+    assert copied[0].read_bytes() == b"valuable"
+
+
+@then("the browser destination tree is not treated as source material")
+def step_destination_not_source_material(context):
+    assert [item.source for item in context.record.plan.items] == [
+        context.source / "photo.jpg"
+    ]
+    assert (context.destination / "existing.jpg").read_bytes() == b"existing output"
+
+
+@then("media written into the browser destination does not become a new candidate")
+def step_output_not_candidate(context):
+    assert context.record.result.total_files == 1
+
+
+@given("browser COPY awaits confirmation for a missing destination inside the source")
+def step_missing_contained_copy_confirmation(context):
+    _workspace(context)
+    context.destination = context.source / "Organised"
+    _media(context.source / "photo.jpg", b"valuable")
+    _client(context)
+    _preflight(context)
+    assert context.record.state is CopyState.AWAITING_CONFIRMATION
+    assert not context.destination.exists()
+
+
+@when("the user confirms COPY into the missing contained destination")
+def step_confirm_missing_contained_copy(context):
+    _decision(context, "copy")
+    assert context.record.finished.wait(timeout=5)
+
+
+@then("the missing contained COPY destination is created")
+def step_missing_contained_copy_created(context):
+    assert context.destination.is_dir()
+
+
+@then("eligible media is copied into the created contained destination")
+def step_media_copied_into_created_contained_destination(context):
+    copied = list(context.destination.rglob("*.jpg"))
+    assert len(copied) == 1
+    assert copied[0].read_bytes() == b"valuable"
+
+
 @then("a second browser COPY is not started")
 def step_single_execution(context):
     assert context.calls == 1

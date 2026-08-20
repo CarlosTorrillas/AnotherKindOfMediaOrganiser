@@ -259,3 +259,110 @@ def step_existing_move(context):
 @then("a second browser MOVE is not started")
 def step_no_second_move(context):
     assert context.calls == 1
+
+
+@given("the browser MOVE destination is contained within the source")
+def step_contained_move_destination(context):
+    _setup(context)
+    context.destination = context.source / "Organised"
+    _media(context.source / "photo.jpg", b"valuable")
+    _media(context.destination / "existing.jpg", b"existing output")
+    context.before = _snapshot(context.source)
+
+
+@given("no contained-destination MOVE mutation has started")
+def step_no_contained_move_mutation(context):
+    assert _snapshot(context.source) == context.before
+
+
+@when("the user starts contained-destination browser MOVE")
+def step_start_contained_move(context):
+    _prepare(context)
+    context.page = context.client.get(context.preflight_url).data
+
+
+@then("AKOMO warns that the MOVE destination is inside the source")
+def step_warn_contained_move(context):
+    assert b"Destination Collection is inside the source Media Collection" in context.page
+    assert b"THIS OPERATION WILL DELETE SOURCE FILES." in context.page
+
+
+@then("AKOMO requires explicit contained-destination MOVE confirmation")
+def step_require_contained_move_confirmation(context):
+    assert b"explicitly accept organising into a destination inside the source" in context.page
+    assert context.record.state is CopyState.AWAITING_CONFIRMATION
+    assert _snapshot(context.source) == context.before
+
+
+@given("AKOMO has warned about contained-destination browser MOVE")
+def step_contained_move_warned(context):
+    step_contained_move_destination(context)
+    step_start_contained_move(context)
+    step_warn_contained_move(context)
+
+
+@when("the user declines contained-destination browser MOVE")
+def step_decline_contained_move(context):
+    context.coordinator.decline(context.record.copy_id)
+
+
+@then("no filesystem content is modified by contained-destination MOVE")
+def step_contained_move_unchanged(context):
+    assert context.record.state is CopyState.DECLINED
+    assert _snapshot(context.source) == context.before
+
+
+@when("the user confirms contained-destination browser MOVE")
+def step_confirm_contained_move(context):
+    context.coordinator.confirm(context.record.copy_id, acceptance="move")
+    assert context.record.finished.wait(timeout=5)
+
+
+@then("eligible source media is moved into the contained destination")
+def step_eligible_contained_move(context):
+    assert not (context.source / "photo.jpg").exists()
+    copied = list((context.destination / "2024").rglob("*.jpg"))
+    assert len(copied) == 1
+    assert copied[0].read_bytes() == b"valuable"
+
+
+@then("existing contained-destination media is not treated as source material")
+def step_existing_contained_media_excluded(context):
+    assert [item.source for item in context.record.plan.items] == [
+        context.source / "photo.jpg"
+    ]
+    assert (context.destination / "existing.jpg").read_bytes() == b"existing output"
+
+
+@then("contained-destination output does not become a new MOVE candidate")
+def step_contained_move_output_fixed(context):
+    assert context.record.result.total_files == 1
+
+
+@given("browser MOVE awaits confirmation for a missing destination inside the source")
+def step_missing_contained_move_confirmation(context):
+    _setup(context)
+    context.destination = context.source / "Organised"
+    _media(context.source / "photo.jpg", b"valuable")
+    _prepare(context)
+    assert context.record.state is CopyState.AWAITING_CONFIRMATION
+    assert not context.destination.exists()
+
+
+@when("the user confirms MOVE into the missing contained destination")
+def step_confirm_missing_contained_move(context):
+    context.coordinator.confirm(context.record.copy_id, acceptance="move")
+    assert context.record.finished.wait(timeout=5)
+
+
+@then("the missing contained MOVE destination is created")
+def step_missing_contained_move_created(context):
+    assert context.destination.is_dir()
+
+
+@then("eligible media is moved into the created contained destination")
+def step_media_moved_into_created_contained_destination(context):
+    copied = list(context.destination.rglob("*.jpg"))
+    assert len(copied) == 1
+    assert copied[0].read_bytes() == b"valuable"
+    assert not (context.source / "photo.jpg").exists()

@@ -34,7 +34,6 @@ Feature: Execute an Organisation Proposal by copying
     Examples:
       | relationship |
       | the same as  |
-      | inside       |
       | containing   |
 
   Scenario: Stop safely after a runtime copy failure

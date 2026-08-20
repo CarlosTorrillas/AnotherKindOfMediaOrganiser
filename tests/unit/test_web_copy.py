@@ -98,6 +98,41 @@ def test_confirmed_copy_uses_existing_executor_and_preserves_source(
     assert job.progress.files_copied == 1
 
 
+def test_destination_inside_source_is_warned_and_excluded_from_candidates(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    destination = source / "Organised"
+    _media(source / "photo.jpg", b"valuable")
+    _media(destination / "existing.jpg", b"existing output")
+    coordinator = _coordinator()
+
+    record = coordinator.prepare(source, destination, ())
+    response = _client(coordinator).get(f"/copy-preflights/{record.copy_id}")
+
+    assert record.plan is not None
+    assert record.plan.destination_is_inside_source
+    assert [item.source for item in record.plan.items] == [source / "photo.jpg"]
+    assert b"Destination Collection is inside the source Media Collection" in response.data
+    assert b"will be excluded from source material for this operation" in response.data
+    assert b"explicitly accept organising into a destination inside the source" in response.data
+    assert (destination / "existing.jpg").read_bytes() == b"existing output"
+
+
+def test_declining_destination_inside_source_writes_nothing(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    destination = source / "Organised"
+    _media(source / "photo.jpg", b"valuable")
+    coordinator = _coordinator()
+    record = coordinator.prepare(source, destination, ())
+
+    declined = coordinator.decline(record.copy_id)
+
+    assert declined is not None
+    assert declined.state is CopyState.DECLINED
+    assert not destination.exists()
+
+
 def test_partial_copy_requires_partial_acceptance_and_copies_only_oldest_month(
     tmp_path: Path,
 ) -> None:
