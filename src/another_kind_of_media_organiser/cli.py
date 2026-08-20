@@ -430,6 +430,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
                 automatic_exclusion = destination_exclusion(
                     parsed_arguments.directory,
                     parsed_arguments.destination,
+                    mode=(
+                        OrganisationExecutionMode.MOVE
+                        if parsed_arguments.move
+                        else OrganisationExecutionMode.COPY
+                    ),
                 )
                 if automatic_exclusion is not None:
                     exclusions += (automatic_exclusion,)
@@ -447,6 +452,13 @@ def main(arguments: Sequence[str] | None = None) -> int:
             )
             return 2
         except ValueError as error:
+            if (
+                parsed_arguments.command == "organise"
+                and isinstance(error, UnsafeDestinationError)
+            ):
+                print(f"Organisation preflight failed: {error}", file=sys.stderr)
+                print("No media files have been copied.", file=sys.stderr)
+                return 2
             print(f"Error: {error}", file=sys.stderr)
             return 2
         except KeyboardInterrupt:
@@ -495,6 +507,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
                     proposal,
                     parsed_arguments.directory,
                     parsed_arguments.destination,
+                    mode=(
+                        OrganisationExecutionMode.MOVE
+                        if parsed_arguments.move
+                        else OrganisationExecutionMode.COPY
+                    ),
                 )
                 capacity = plan_organisation_capacity(
                     proposal,
@@ -514,6 +531,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
                         capacity.execution_proposal,
                         parsed_arguments.directory,
                         parsed_arguments.destination,
+                        mode=(
+                            OrganisationExecutionMode.MOVE
+                            if parsed_arguments.move
+                            else OrganisationExecutionMode.COPY
+                        ),
                     )
                     if capacity.is_partial
                     else full_plan

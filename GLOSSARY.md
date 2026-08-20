@@ -8,7 +8,7 @@ The source root directory selected by the user for scanning. A Media Collection 
 
 ## Destination Collection
 
-A root directory that receives organised copies during Organisation Execution. Its structure comes from an accepted Organisation Proposal. It may be inside the source Media Collection only after a specific warning and explicit user confirmation; in that case its entire subtree is excluded before the Organisation Proposal is generated. It cannot be the same as the source or contain the source Media Collection.
+A root directory that receives organised copies during Organisation Execution. Its structure comes from an accepted Organisation Proposal. For COPY Organisation Execution, it may be inside the source Media Collection only after a specific warning and explicit user confirmation; in that case its entire subtree is excluded before the Organisation Proposal is generated. MOVE Organisation Execution still requires it to be outside the source. It cannot be the same as the source or contain the source Media Collection.
 
 ## Scan
 

@@ -99,12 +99,14 @@ def prepare_organisation_execution(
     proposal: OrganisationProposal,
     source_root: Path,
     destination_root: Path,
+    *,
+    mode: OrganisationExecutionMode = OrganisationExecutionMode.COPY,
 ) -> OrganisationExecutionPlan:
     """Validate the complete copy plan without creating destination content."""
     source = source_root.resolve(strict=True)
     destination = destination_root.resolve(strict=False)
     destination_is_inside_source = (
-        destination_exclusion(source, destination) is not None
+        destination_exclusion(source, destination, mode=mode) is not None
     )
     if _path_exists(destination) and not destination.is_dir():
         raise UnsafeDestinationError(
@@ -169,6 +171,13 @@ def execute_organisation_plan(
     delete_file: DeleteFile = delete_file,
 ) -> OrganisationExecutionResult:
     """Execute each placement, optionally verifying before deleting its source."""
+    if (
+        mode is OrganisationExecutionMode.MOVE
+        and plan.destination_is_inside_source
+    ):
+        raise UnsafeDestinationError(
+            "Destination Collection cannot be inside source for MOVE"
+        )
     files_copied = 0
     bytes_copied = 0
     files_verified = 0
@@ -247,13 +256,22 @@ def execute_organisation_plan(
     )
 
 
-def destination_exclusion(source_root: Path, destination_root: Path) -> Path | None:
+def destination_exclusion(
+    source_root: Path,
+    destination_root: Path,
+    *,
+    mode: OrganisationExecutionMode = OrganisationExecutionMode.COPY,
+) -> Path | None:
     """Return the relative destination subtree to exclude, rejecting unsafe roots."""
     source = source_root.resolve(strict=False)
     destination = destination_root.resolve(strict=False)
     if source == destination:
         raise UnsafeDestinationError("Source and destination must be different")
     if destination.is_relative_to(source):
+        if mode is OrganisationExecutionMode.MOVE:
+            raise UnsafeDestinationError(
+                "Destination Collection cannot be inside source for MOVE"
+            )
         return destination.relative_to(source)
     if source.is_relative_to(destination):
         raise UnsafeDestinationError(
