@@ -62,3 +62,9 @@ Feature: Organise an accepted proposal by verified MOVE from the browser
     Then eligible source media is moved into the contained destination
     And existing contained-destination media is not treated as source material
     And contained-destination output does not become a new MOVE candidate
+
+  Scenario: MOVE creates a missing destination inside the source
+    Given browser MOVE awaits confirmation for a missing destination inside the source
+    When the user confirms MOVE into the missing contained destination
+    Then the missing contained MOVE destination is created
+    And eligible media is moved into the created contained destination

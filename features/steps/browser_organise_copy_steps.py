@@ -360,6 +360,35 @@ def step_output_not_candidate(context):
     assert context.record.result.total_files == 1
 
 
+@given("browser COPY awaits confirmation for a missing destination inside the source")
+def step_missing_contained_copy_confirmation(context):
+    _workspace(context)
+    context.destination = context.source / "Organised"
+    _media(context.source / "photo.jpg", b"valuable")
+    _client(context)
+    _preflight(context)
+    assert context.record.state is CopyState.AWAITING_CONFIRMATION
+    assert not context.destination.exists()
+
+
+@when("the user confirms COPY into the missing contained destination")
+def step_confirm_missing_contained_copy(context):
+    _decision(context, "copy")
+    assert context.record.finished.wait(timeout=5)
+
+
+@then("the missing contained COPY destination is created")
+def step_missing_contained_copy_created(context):
+    assert context.destination.is_dir()
+
+
+@then("eligible media is copied into the created contained destination")
+def step_media_copied_into_created_contained_destination(context):
+    copied = list(context.destination.rglob("*.jpg"))
+    assert len(copied) == 1
+    assert copied[0].read_bytes() == b"valuable"
+
+
 @then("a second browser COPY is not started")
 def step_single_execution(context):
     assert context.calls == 1

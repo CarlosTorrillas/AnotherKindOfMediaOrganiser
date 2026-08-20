@@ -57,3 +57,9 @@ Feature: Organise an accepted proposal by COPY from the browser
     Then AKOMO organises the eligible browser source media
     And the browser destination tree is not treated as source material
     And media written into the browser destination does not become a new candidate
+
+  Scenario: COPY creates a missing destination inside the source
+    Given browser COPY awaits confirmation for a missing destination inside the source
+    When the user confirms COPY into the missing contained destination
+    Then the missing contained COPY destination is created
+    And eligible media is copied into the created contained destination

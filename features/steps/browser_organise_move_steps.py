@@ -337,3 +337,32 @@ def step_existing_contained_media_excluded(context):
 @then("contained-destination output does not become a new MOVE candidate")
 def step_contained_move_output_fixed(context):
     assert context.record.result.total_files == 1
+
+
+@given("browser MOVE awaits confirmation for a missing destination inside the source")
+def step_missing_contained_move_confirmation(context):
+    _setup(context)
+    context.destination = context.source / "Organised"
+    _media(context.source / "photo.jpg", b"valuable")
+    _prepare(context)
+    assert context.record.state is CopyState.AWAITING_CONFIRMATION
+    assert not context.destination.exists()
+
+
+@when("the user confirms MOVE into the missing contained destination")
+def step_confirm_missing_contained_move(context):
+    context.coordinator.confirm(context.record.copy_id, acceptance="move")
+    assert context.record.finished.wait(timeout=5)
+
+
+@then("the missing contained MOVE destination is created")
+def step_missing_contained_move_created(context):
+    assert context.destination.is_dir()
+
+
+@then("eligible media is moved into the created contained destination")
+def step_media_moved_into_created_contained_destination(context):
+    copied = list(context.destination.rglob("*.jpg"))
+    assert len(copied) == 1
+    assert copied[0].read_bytes() == b"valuable"
+    assert not (context.source / "photo.jpg").exists()
