@@ -120,6 +120,29 @@ def test_declining_destination_inside_source_performs_no_mutation(
     assert (source / "photo.jpg").read_bytes() == b"valuable"
 
 
+def test_move_rejects_destination_inside_source_before_confirmation_or_mutation(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    source = tmp_path / "source"
+    destination = source / "Organised"
+    _dated_file(source / "photo.jpg", b"valuable", 2024, 1)
+
+    def unexpected_confirmation(_prompt):
+        raise AssertionError("contained-destination MOVE must not request confirmation")
+
+    monkeypatch.setattr("builtins.input", unexpected_confirmation)
+
+    assert main(
+        ["organise", str(source), "--destination", str(destination), "--move"]
+    ) == 2
+
+    error = capsys.readouterr().err
+    assert "Destination Collection cannot be inside source for MOVE" in error
+    assert "No media files have been copied." in error
+    assert (source / "photo.jpg").read_bytes() == b"valuable"
+    assert not destination.exists()
+
+
 def test_destination_conflict_fails_before_confirmation_or_copying(
     tmp_path: Path, capsys, monkeypatch
 ) -> None:

@@ -3,12 +3,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from threading import Event
 
+import pytest
+
 from another_kind_of_media_organiser.application.capacity_preflight import DEFAULT_SAFETY_RESERVE_BYTES
 from another_kind_of_media_organiser.application.execute_organisation_proposal import (
     OrganisationDeletionError,
     OrganisationExecutionMode,
     OrganisationExecutionProgress,
     OrganisationVerificationError,
+    UnsafeDestinationError,
 )
 from another_kind_of_media_organiser.presentation.web import create_app
 from another_kind_of_media_organiser.presentation.web.copy_jobs import CopyCoordinator, CopyState
@@ -67,6 +70,26 @@ def test_confirmed_move_uses_verified_application_mode(tmp_path: Path) -> None:
     assert next(destination.rglob("*.jpg")).read_bytes() == b"valuable"
     assert record.result.files_verified == 1
     assert record.result.source_files_deleted == 1
+
+
+def test_move_rejects_a_destination_inside_the_source_before_mutation(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    destination = source / "Organised"
+    _media(source / "photo.jpg", b"valuable")
+    coordinator = _coordinator()
+
+    with pytest.raises(UnsafeDestinationError):
+        coordinator.prepare(
+            source,
+            destination,
+            (),
+            mode=OrganisationExecutionMode.MOVE,
+        )
+
+    assert (source / "photo.jpg").read_bytes() == b"valuable"
+    assert not destination.exists()
 
 
 def test_verification_failure_reports_and_preserves_source(tmp_path: Path) -> None:
