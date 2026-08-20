@@ -43,3 +43,22 @@ Feature: Organise an accepted proposal by verified MOVE from the browser
     When the browser reconnects to MOVE progress
     Then the existing browser MOVE execution is shown
     And a second browser MOVE is not started
+
+  Scenario: Warn before MOVE into a destination inside the source
+    Given the browser MOVE destination is contained within the source
+    And no contained-destination MOVE mutation has started
+    When the user starts contained-destination browser MOVE
+    Then AKOMO warns that the MOVE destination is inside the source
+    And AKOMO requires explicit contained-destination MOVE confirmation
+
+  Scenario: Decline MOVE into a destination inside the source
+    Given AKOMO has warned about contained-destination browser MOVE
+    When the user declines contained-destination browser MOVE
+    Then no filesystem content is modified by contained-destination MOVE
+
+  Scenario: Confirm MOVE into a destination inside the source
+    Given AKOMO has warned about contained-destination browser MOVE
+    When the user confirms contained-destination browser MOVE
+    Then eligible source media is moved into the contained destination
+    And existing contained-destination media is not treated as source material
+    And contained-destination output does not become a new MOVE candidate

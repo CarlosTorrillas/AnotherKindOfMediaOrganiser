@@ -62,42 +62,38 @@ def test_preflight_allows_a_destination_inside_the_source(
     assert [item.source for item in plan.items] == [source / "photo.jpg"]
 
 
-def test_move_preflight_rejects_a_destination_inside_the_source(
+def test_move_preflight_allows_a_destination_inside_the_source(
     tmp_path: Path,
 ) -> None:
     source = tmp_path / "source"
     proposal = proposal_for(source, {"photo.jpg": b"valuable"})
 
-    with pytest.raises(UnsafeDestinationError):
-        prepare_organisation_execution(
-            proposal,
-            source,
-            source / "organised",
-            mode=OrganisationExecutionMode.MOVE,
-        )
+    plan = prepare_organisation_execution(
+        proposal,
+        source,
+        source / "organised",
+        mode=OrganisationExecutionMode.MOVE,
+    )
 
+    assert plan.destination_is_inside_source
     assert (source / "photo.jpg").read_bytes() == b"valuable"
 
 
-def test_move_executor_rejects_a_contained_destination_copy_plan(
+def test_move_executor_processes_a_fixed_contained_destination_plan(
     tmp_path: Path,
 ) -> None:
     source = tmp_path / "source"
     proposal = proposal_for(source, {"photo.jpg": b"valuable"})
     plan = prepare_organisation_execution(proposal, source, source / "organised")
 
-    def unexpected_copy(*_args):
-        raise AssertionError("contained-destination MOVE must not copy")
+    result = execute_organisation_plan(
+        plan,
+        mode=OrganisationExecutionMode.MOVE,
+    )
 
-    with pytest.raises(UnsafeDestinationError):
-        execute_organisation_plan(
-            plan,
-            mode=OrganisationExecutionMode.MOVE,
-            copy_file=unexpected_copy,
-        )
-
-    assert (source / "photo.jpg").read_bytes() == b"valuable"
-    assert not plan.destination_root.exists()
+    assert result.source_files_deleted == 1
+    assert not (source / "photo.jpg").exists()
+    assert next(plan.destination_root.rglob("*.jpg")).read_bytes() == b"valuable"
 
 
 def test_preflight_rejects_a_destination_that_escapes_the_root(
