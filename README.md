@@ -106,15 +106,15 @@ review directories.
 The `organise` command is the only writing workflow. It displays the complete
 lightweight execution summary and defaults confirmation to No before copying.
 Preflight rejects identical source and destination roots, a source inside its
-destination, and every existing planned destination before the first copy. For
-COPY only, a destination inside the source is allowed after a specific warning
-and explicit confirmation. Its entire existing subtree is automatically
-excluded before the proposal is generated, and execution consumes that fixed
-proposal, so neither existing destination media nor newly written output becomes
-source material during the operation. MOVE into a destination inside the source
-remains rejected. Completed files are kept if a later runtime failure occurs;
-incomplete copies use distinguishable temporary files and are cleaned up on a
-best-effort basis.
+destination, and every existing planned destination before the first copy. A
+destination inside the source is allowed only after a specific warning and
+explicit confirmation. Its entire existing subtree is automatically excluded
+before the proposal is generated, and execution consumes that fixed proposal,
+so neither existing destination media nor newly written output becomes source
+material during the operation. For MOVE, the normal `COPY → VERIFY → DELETE
+SOURCE` order still applies to each eligible source file. Completed files are
+kept if a later runtime failure occurs; incomplete copies use distinguishable
+temporary files and are cleaned up on a best-effort basis.
 
 Before COPY or MOVE confirmation, Capacity Preflight reports required space,
 available space, destination allocation unit, and a fixed 1 GiB safety reserve.

@@ -171,13 +171,6 @@ def execute_organisation_plan(
     delete_file: DeleteFile = delete_file,
 ) -> OrganisationExecutionResult:
     """Execute each placement, optionally verifying before deleting its source."""
-    if (
-        mode is OrganisationExecutionMode.MOVE
-        and plan.destination_is_inside_source
-    ):
-        raise UnsafeDestinationError(
-            "Destination Collection cannot be inside source for MOVE"
-        )
     files_copied = 0
     bytes_copied = 0
     files_verified = 0
@@ -268,10 +261,6 @@ def destination_exclusion(
     if source == destination:
         raise UnsafeDestinationError("Source and destination must be different")
     if destination.is_relative_to(source):
-        if mode is OrganisationExecutionMode.MOVE:
-            raise UnsafeDestinationError(
-                "Destination Collection cannot be inside source for MOVE"
-            )
         return destination.relative_to(source)
     if source.is_relative_to(destination):
         raise UnsafeDestinationError(

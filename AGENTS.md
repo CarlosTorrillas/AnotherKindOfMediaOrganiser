@@ -105,12 +105,11 @@ Preserve these established distinctions and invariants:
   **COPY → byte-for-byte VERIFY → DELETE SOURCE**. Never use a cached digest as
   evidence authorising source deletion.
 - Never overwrite an existing destination. Reject identical source/destination
-  roots and a source inside the destination. For COPY only, a destination inside
-  the source requires a specific warning and explicit confirmation, and its
-  entire subtree must be excluded from source material before the proposal is
-  generated so existing or newly written destination media cannot become
-  candidates during that operation. MOVE into a destination inside the source
-  remains rejected unless a future agreed story specifies that behaviour.
+  roots and a source inside the destination. A destination inside the source
+  requires a specific warning and explicit confirmation, and its entire subtree
+  must be excluded from source material before the proposal is generated so
+  existing or newly written destination media cannot become candidates during
+  that operation.
 - Atomic copies use a distinguishable same-directory temporary file, clean an
   incomplete temporary copy where safe, and preserve only the required
   modification timestamp rather than broad macOS metadata.
